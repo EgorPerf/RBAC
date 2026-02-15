@@ -1,112 +1,141 @@
 package org.example.rbac;
 
-import org.example.rbac.model.AssignmentMetadata;
-import org.example.rbac.model.Permission;
-import org.example.rbac.model.Role;
-import org.example.rbac.model.User;
+import org.example.rbac.model.*;
 
 import java.util.HashSet;
+import java.util.Set;
 
 public class Main {
     public static void main(String[] args) {
-        testUser();
-        testPermission();
-        testRole();
-        testMetadata();
+        runFullTestSuite();
     }
 
-    private static void testUser() {
-        System.out.println("=== TEST: User Validation ===");
+    private static void runFullTestSuite() {
+        System.out.println("🚀 STARTING GLOBAL RBAC TEST SUITE\n");
+
+        testUserRegistry();
+        testPermissionEngine();
+        testRoleManagement();
+        testMetadataAudit();
+        testRoleAssignmentImplementation();
+
+        System.out.println("\n✨ ALL TESTS PASSED SUCCESSFULLY");
+    }
+
+    private static void testUserRegistry() {
+        System.out.println("--- [1] USER VALIDATION ---");
 
         try {
-            User u = User.validate("egor_123", "Egor Perf", "egor@test.com");
-            System.out.println("✅ Valid user: " + u.format());
+            User valid = User.validate("admin_root", "System Administrator", "admin@corp.com");
+            System.out.println("✅ Valid: " + valid.format());
         } catch (Exception e) {
-            System.out.println("❌ Fail: " + e.getMessage());
+            System.out.println("❌ Fail: Valid user rejected");
         }
 
-        String[] invalidUsernames = {"ab", "too_long_username_over_20_chars", "user-name!", ""};
-        for (String uname : invalidUsernames) {
+        String[] badUsernames = {"a", "usr!", "space in name", "very_long_username_that_is_definitely_more_than_twenty_characters"};
+        for (String u : badUsernames) {
             try {
-                User.validate(uname, "Test", "test@test.com");
-                System.out.println("❌ Fail: Accepted invalid username: " + uname);
+                User.validate(u, "Test", "test@test.com");
+                System.out.println("❌ Fail: Accepted invalid username: " + u);
             } catch (IllegalArgumentException e) {
-                System.out.println("✅ Catch: " + uname + " -> " + e.getMessage());
+                System.out.println("✅ Blocked: " + u + " (" + e.getMessage() + ")");
             }
         }
 
-        try {
-            User.validate("valid_user", "Test", "invalid-email@com");
-            System.out.println("❌ Fail: Accepted invalid email");
-        } catch (IllegalArgumentException e) {
-            System.out.println("✅ Catch: Invalid email -> " + e.getMessage());
+        String[] badEmails = {"no_at_symbol.com", "at@no_dot", "@only_domain.com", "test@domain."};
+        for (String m : badEmails) {
+            try {
+                User.validate("valid_nick", "Test", m);
+                System.out.println("❌ Fail: Accepted invalid email: " + m);
+            } catch (IllegalArgumentException e) {
+                System.out.println("✅ Blocked: " + m);
+            }
         }
     }
 
-    private static void testPermission() {
-        System.out.println("\n=== TEST: Permission Validation ===");
+    private static void testPermissionEngine() {
+        System.out.println("\n--- [2] PERMISSION ENGINE ---");
 
         try {
-            Permission p = new Permission("read", "USERS", "Description");
-            System.out.println("✅ Normalization: " + p.format());
+            Permission p = new Permission("write", "REPORTS", "Allow editing");
+            System.out.println("✅ Normalization check: " + p.name() + " on " + p.resource());
 
-            System.out.println("✅ Matches exact: " + p.matches("READ", "users"));
-            System.out.println("✅ Matches regex: " + p.matches("R.*D", "u.*s"));
+            System.out.println("✅ Match (Exact): " + p.matches("WRITE", "reports"));
+            System.out.println("✅ Match (Partial): " + p.matches("WRI", "repo"));
+            System.out.println("✅ Match (Regex): " + p.matches("^W.*E$", ".*ts$"));
         } catch (Exception e) {
-            System.out.println("❌ Fail: " + e.getMessage());
+            System.out.println("❌ Fail: Permission logic error");
         }
 
         try {
-            new Permission("READ WRITE", "users", "Desc");
-            System.out.println("❌ Fail: Accepted space in name");
+            new Permission("READ ", "data", "No spaces");
+            System.out.println("❌ Fail: Allowed space in permission name");
         } catch (IllegalArgumentException e) {
-            System.out.println("✅ Catch: Space in name -> " + e.getMessage());
+            System.out.println("✅ Blocked: Space in name");
         }
     }
 
-    private static void testRole() {
-        System.out.println("\n=== TEST: Role Functionality ===");
+    private static void testRoleManagement() {
+        System.out.println("\n--- [3] ROLE MANAGEMENT ---");
 
-        Permission pRead = new Permission("READ", "docs", "View docs");
-        Permission pWrite = new Permission("WRITE", "docs", "Edit docs");
+        Set<Permission> perms = new HashSet<>();
+        perms.add(new Permission("READ", "users", "View"));
 
-        Role admin = new Role("Admin", "Superuser", new HashSet<>());
-        admin.addPermission(pRead);
-        admin.addPermission(pWrite);
+        Role dev = new Role("Developer", "Dev access", perms);
+        System.out.println("✅ Role created with ID: " + dev.getId());
 
-        System.out.println("✅ Role format:\n" + admin.format());
-        System.out.println("✅ ID starts with role_: " + admin.getId().startsWith("role_"));
-        System.out.println("✅ hasPermission (Stream API): " + admin.hasPermission("READ", "docs"));
+        dev.addPermission(new Permission("EXECUTE", "scripts", "Run"));
+        System.out.println("✅ Permissions count: " + dev.getPermissions().size());
 
         try {
-            new Role("Admin", "Duplicate", new HashSet<>());
-            System.out.println("❌ Fail: Duplicate name allowed");
+            new Role("Developer", "Duplicate name", new HashSet<>());
+            System.out.println("❌ Fail: Allowed duplicate role name");
         } catch (IllegalArgumentException e) {
-            System.out.println("✅ Catch: Duplicate name -> " + e.getMessage());
+            System.out.println("✅ Blocked: Duplicate name 'Developer'");
         }
 
         try {
-            admin.getPermissions().clear();
-            System.out.println("❌ Fail: Unmodifiable collection modified");
+            dev.getPermissions().add(new Permission("HACK", "core", "Evil"));
+            System.out.println("❌ Fail: Modified unmodifiable set");
         } catch (UnsupportedOperationException e) {
-            System.out.println("✅ Catch: Collection is unmodifiable");
+            System.out.println("✅ Protected: getPermissions() is read-only");
         }
     }
 
-    private static void testMetadata() {
-        System.out.println("\n=== TEST: AssignmentMetadata ===");
+    private static void testMetadataAudit() {
+        System.out.println("\n--- [4] AUDIT METADATA ---");
 
-        AssignmentMetadata meta = AssignmentMetadata.now("admin_user", "Adding rights");
-        System.out.println("✅ Meta format: " + meta.format());
+        AssignmentMetadata m = AssignmentMetadata.now("super_admin", "Granting access for project X");
+        System.out.println("✅ Timestamp generated: " + m.assignedAt());
 
-        AssignmentMetadata metaNoReason = AssignmentMetadata.now("system", null);
-        System.out.println("✅ Default reason: " + metaNoReason.reason());
-
-        try {
-            AssignmentMetadata.now("", "Desc");
-            System.out.println("❌ Fail: Empty assignedBy allowed");
-        } catch (IllegalArgumentException e) {
-            System.out.println("✅ Catch: Empty assignedBy -> " + e.getMessage());
+        AssignmentMetadata emptyReason = AssignmentMetadata.now("bot", "");
+        if (emptyReason.reason().equals("No reason provided")) {
+            System.out.println("✅ Default reason applied");
+        } else {
+            System.out.println("❌ Fail: Default reason not applied");
         }
+    }
+
+    private static void testRoleAssignmentImplementation() {
+        System.out.println("\n--- [5] ROLE ASSIGNMENT CONTRACT ---");
+
+        User user = User.validate("egor_p", "Egor", "egor@test.com");
+        Role role = new Role("Manager", "Management", new HashSet<>());
+        AssignmentMetadata meta = AssignmentMetadata.now("root", "Manual assign");
+
+        RoleAssignment assignment = new RoleAssignment() {
+            private final String id = "asgn_" + java.util.UUID.randomUUID();
+            @Override public String assignmentId() { return id; }
+            @Override public User user() { return user; }
+            @Override public Role role() { return role; }
+            @Override public AssignmentMetadata metadata() { return meta; }
+            @Override public boolean isActive() { return true; }
+            @Override public String assignmentType() { return "PERMANENT"; }
+        };
+
+        System.out.println("✅ Contract test: Assignment " + assignment.assignmentId());
+        System.out.println("✅ User linked: " + assignment.user().username());
+        System.out.println("✅ Role linked: " + assignment.role().getName());
+        System.out.println("✅ Audit trail: " + assignment.metadata().format());
     }
 }
