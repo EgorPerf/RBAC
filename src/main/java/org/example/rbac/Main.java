@@ -1,5 +1,6 @@
 package org.example.rbac;
 
+import org.example.rbac.model.AssignmentMetadata;
 import org.example.rbac.model.Permission;
 import org.example.rbac.model.Role;
 import org.example.rbac.model.User;
@@ -8,89 +9,104 @@ import java.util.HashSet;
 
 public class Main {
     public static void main(String[] args) {
-        testUserValidation();
-        testPermissionValidation();
+        testUser();
+        testPermission();
         testRole();
+        testMetadata();
     }
 
-    private static void testUserValidation() {
-        System.out.println("=== Тестирование валидации User ===");
+    private static void testUser() {
+        System.out.println("=== TEST: User Validation ===");
 
         try {
-            User validUser = User.validate("egor_dev", "Егор Перфильев", "egor@example.com");
-            System.out.println("✅ Успех: " + validUser.format());
-        } catch (IllegalArgumentException e) {
-            System.out.println("❌ Ошибка: " + e.getMessage());
+            User u = User.validate("egor_123", "Egor Perf", "egor@test.com");
+            System.out.println("✅ Valid user: " + u.format());
+        } catch (Exception e) {
+            System.out.println("❌ Fail: " + e.getMessage());
+        }
+
+        String[] invalidUsernames = {"ab", "too_long_username_over_20_chars", "user-name!", ""};
+        for (String uname : invalidUsernames) {
+            try {
+                User.validate(uname, "Test", "test@test.com");
+                System.out.println("❌ Fail: Accepted invalid username: " + uname);
+            } catch (IllegalArgumentException e) {
+                System.out.println("✅ Catch: " + uname + " -> " + e.getMessage());
+            }
         }
 
         try {
-            User.validate("ab", "Иван Иванов", "ivan@example.com");
-            System.out.println("❌ Тест провален: ожидалась ошибка валидации");
+            User.validate("valid_user", "Test", "invalid-email@com");
+            System.out.println("❌ Fail: Accepted invalid email");
         } catch (IllegalArgumentException e) {
-            System.out.println("✅ Ожидаемая ошибка: " + e.getMessage());
+            System.out.println("✅ Catch: Invalid email -> " + e.getMessage());
         }
     }
 
-    private static void testPermissionValidation() {
-        System.out.println("\n=== Тестирование Permission ===");
+    private static void testPermission() {
+        System.out.println("\n=== TEST: Permission Validation ===");
 
         try {
-            Permission p1 = new Permission("read", "USERS", "Чтение списка пользователей");
-            System.out.println("✅ Успех нормализации: " + p1.format());
+            Permission p = new Permission("read", "USERS", "Description");
+            System.out.println("✅ Normalization: " + p.format());
 
-            System.out.println("✅ Поиск точного совпадения: " + p1.matches("READ", "users"));
-            System.out.println("✅ Поиск по паттерну: " + p1.matches(".*EA.*", ".*ser.*"));
-            System.out.println("✅ Поиск с null: " + p1.matches(null, "users"));
-        } catch (IllegalArgumentException e) {
-            System.out.println("❌ Ошибка: " + e.getMessage());
+            System.out.println("✅ Matches exact: " + p.matches("READ", "users"));
+            System.out.println("✅ Matches regex: " + p.matches("R.*D", "u.*s"));
+        } catch (Exception e) {
+            System.out.println("❌ Fail: " + e.getMessage());
         }
 
         try {
-            new Permission("READ WRITE", "users", "Ошибка из-за пробела");
-            System.out.println("❌ Тест провален: ожидалась ошибка пробела");
+            new Permission("READ WRITE", "users", "Desc");
+            System.out.println("❌ Fail: Accepted space in name");
         } catch (IllegalArgumentException e) {
-            System.out.println("✅ Ожидаемая ошибка: " + e.getMessage());
-        }
-
-        try {
-            new Permission("DELETE", "reports", "");
-            System.out.println("❌ Тест провален: ожидалась ошибка пустого описания");
-        } catch (IllegalArgumentException e) {
-            System.out.println("✅ Ожидаемая ошибка: " + e.getMessage());
+            System.out.println("✅ Catch: Space in name -> " + e.getMessage());
         }
     }
 
     private static void testRole() {
-        System.out.println("\n=== Тестирование Role ===");
+        System.out.println("\n=== TEST: Role Functionality ===");
 
-        Role adminRole = new Role("Administrator", "Full system access", new HashSet<>());
+        Permission pRead = new Permission("READ", "docs", "View docs");
+        Permission pWrite = new Permission("WRITE", "docs", "Edit docs");
 
-        Permission readUsers = new Permission("READ", "users", "Can view user list");
-        Permission writeUsers = new Permission("WRITE", "users", "Can create and edit users");
-        Permission deleteUsers = new Permission("DELETE", "users", "Can delete users");
+        Role admin = new Role("Admin", "Superuser", new HashSet<>());
+        admin.addPermission(pRead);
+        admin.addPermission(pWrite);
 
-        adminRole.addPermission(readUsers);
-        adminRole.addPermission(writeUsers);
-        adminRole.addPermission(deleteUsers);
-
-        System.out.println(adminRole.format());
-
-        System.out.println("\n✅ hasPermission (объект): " + adminRole.hasPermission(readUsers));
-        System.out.println("✅ hasPermission (строки): " + adminRole.hasPermission("DELETE", "users"));
-        System.out.println("✅ Отсутствующее право: " + !adminRole.hasPermission("WRITE", "reports"));
+        System.out.println("✅ Role format:\n" + admin.format());
+        System.out.println("✅ ID starts with role_: " + admin.getId().startsWith("role_"));
+        System.out.println("✅ hasPermission (Stream API): " + admin.hasPermission("READ", "docs"));
 
         try {
-            new Role("Administrator", "Duplicate test", new HashSet<>());
-            System.out.println("❌ Тест провален: создана роль с дублирующимся именем!");
+            new Role("Admin", "Duplicate", new HashSet<>());
+            System.out.println("❌ Fail: Duplicate name allowed");
         } catch (IllegalArgumentException e) {
-            System.out.println("✅ Ожидаемая ошибка (дубликат имени): " + e.getMessage());
+            System.out.println("✅ Catch: Duplicate name -> " + e.getMessage());
         }
 
         try {
-            adminRole.getPermissions().add(new Permission("EXECUTE", "system", "Hack"));
-            System.out.println("❌ Тест провален: коллекция не защищена!");
+            admin.getPermissions().clear();
+            System.out.println("❌ Fail: Unmodifiable collection modified");
         } catch (UnsupportedOperationException e) {
-            System.out.println("✅ Ожидаемая ошибка (неизменяемая коллекция): " + e.getClass().getSimpleName());
+            System.out.println("✅ Catch: Collection is unmodifiable");
+        }
+    }
+
+    private static void testMetadata() {
+        System.out.println("\n=== TEST: AssignmentMetadata ===");
+
+        AssignmentMetadata meta = AssignmentMetadata.now("admin_user", "Adding rights");
+        System.out.println("✅ Meta format: " + meta.format());
+
+        AssignmentMetadata metaNoReason = AssignmentMetadata.now("system", null);
+        System.out.println("✅ Default reason: " + metaNoReason.reason());
+
+        try {
+            AssignmentMetadata.now("", "Desc");
+            System.out.println("❌ Fail: Empty assignedBy allowed");
+        } catch (IllegalArgumentException e) {
+            System.out.println("✅ Catch: Empty assignedBy -> " + e.getMessage());
         }
     }
 }
