@@ -16,7 +16,7 @@ public class Main {
         testPermissionEngine();
         testRoleManagement();
         testMetadataAudit();
-        testAbstractRoleAssignment();
+        testPermanentAssignment();
 
         System.out.println("\n✨ ALL TESTS PASSED SUCCESSFULLY");
     }
@@ -27,7 +27,7 @@ public class Main {
             User valid = User.validate("admin_root", "System Administrator", "admin@corp.com");
             System.out.println("✅ Valid: " + valid.format());
         } catch (Exception e) {
-            System.out.println("❌ Fail: Valid user rejected");
+            System.out.println("❌ Fail: " + e.getMessage());
         }
     }
 
@@ -37,7 +37,7 @@ public class Main {
             Permission p = new Permission("write", "REPORTS", "Allow editing");
             System.out.println("✅ Normalization check: " + p.name());
         } catch (Exception e) {
-            System.out.println("❌ Fail: Permission logic error");
+            System.out.println("❌ Fail: " + e.getMessage());
         }
     }
 
@@ -53,55 +53,35 @@ public class Main {
         System.out.println("✅ Metadata audit trail: " + m.format());
     }
 
-    private static void testAbstractRoleAssignment() {
-        System.out.println("\n--- [5] ABSTRACT ROLE ASSIGNMENT ---");
+    private static void testPermanentAssignment() {
+        System.out.println("\n--- [5] PERMANENT ASSIGNMENT TEST ---");
 
         User user = User.validate("egor_p", "Egor", "egor@test.com");
         Role role = new Role("Manager", "Management", new HashSet<>());
         AssignmentMetadata meta = AssignmentMetadata.now("root", "Manual setup");
 
-        AbstractRoleAssignment assignment = new AbstractRoleAssignment(user, role, meta) {
-            @Override
-            public boolean isActive() {
-                return true;
-            }
+        PermanentAssignment pa = new PermanentAssignment(user, role, meta);
 
-            @Override
-            public String assignmentType() {
-                return "PERMANENT";
-            }
-        };
+        System.out.println("✅ Initial Type: " + pa.assignmentType());
+        System.out.println("✅ Initial Active Status: " + pa.isActive());
 
-        System.out.println("✅ ID Auto-generation: " + assignment.assignmentId());
-
-        String summary = assignment.summary();
-        System.out.println("✅ Summary Format Check:\n" + summary);
-
-        if (!summary.contains("[PERMANENT]") || !summary.contains("ACTIVE") || !summary.contains("Manual setup")) {
-            System.out.println("❌ Fail: Summary string format is incorrect");
-        } else {
-            System.out.println("✅ Summary content is valid");
+        if (!pa.summary().contains("ACTIVE")) {
+            System.out.println("❌ Fail: Summary should show ACTIVE status");
         }
 
-        AbstractRoleAssignment sameId = new AbstractRoleAssignment(user, role, meta) {
-            @Override public boolean isActive() { return true; }
-            @Override public String assignmentType() { return "TEST"; }
-        };
+        System.out.println("🔄 Revoking assignment...");
+        pa.revoke();
 
-        if (assignment.equals(sameId)) {
-            System.out.println("❌ Fail: Different assignments should have different IDs");
+        if (pa.isRevoked() && !pa.isActive()) {
+            System.out.println("✅ Success: Assignment is no longer active");
         } else {
-            System.out.println("✅ Identity check: Unique IDs for different instances");
+            System.out.println("❌ Fail: Revoke logic not working");
         }
 
-        try {
-            new AbstractRoleAssignment(null, role, meta) {
-                @Override public boolean isActive() { return true; }
-                @Override public String assignmentType() { return "TEST"; }
-            };
-            System.out.println("❌ Fail: Allowed null user in constructor");
-        } catch (IllegalArgumentException e) {
-            System.out.println("✅ Blocked: Null constructor arguments");
+        System.out.println("✅ Final Summary Check:\n" + pa.summary());
+
+        if (!pa.summary().contains("INACTIVE")) {
+            System.out.println("❌ Fail: Summary should show INACTIVE status after revoke");
         }
     }
 }
