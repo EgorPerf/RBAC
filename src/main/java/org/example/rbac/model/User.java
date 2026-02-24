@@ -7,7 +7,7 @@ public record User(String username, String fullName, String email) {
     private static final Pattern USERNAME_PATTERN = Pattern.compile("^[a-zA-Z0-9_]{3,20}$");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
 
-    public static User validate(String username, String fullName, String email) {
+    public static User create(String username, String fullName, String email) {
         if (fullName == null || fullName.isBlank()) {
             throw new IllegalArgumentException("FullName не может быть пустым.");
         }

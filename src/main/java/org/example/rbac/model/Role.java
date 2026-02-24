@@ -111,4 +111,7 @@ public class Role {
 
         return sb.toString();
     }
+    public static void clearUsedNames() {
+        USED_NAMES.clear();
+    }
 }

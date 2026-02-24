@@ -52,4 +52,16 @@ public class TemporaryAssignment extends AbstractRoleAssignment {
     public boolean isAutoRenew() {
         return autoRenew;
     }
+    public String getTimeRemaining() {
+        if (isExpired()) {
+            return "Time is up";
+        }
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        java.time.LocalDateTime expiration = java.time.LocalDateTime.parse(this.expiresAt);
+        java.time.Duration duration = java.time.Duration.between(now, expiration);
+
+        long days = duration.toDays();
+        long hours = duration.toHoursPart();
+        return String.format("%d days, %d hours remaining", days, hours);
+    }
 }
