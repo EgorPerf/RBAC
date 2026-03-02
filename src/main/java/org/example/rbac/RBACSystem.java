@@ -58,17 +58,24 @@ public class RBACSystem {
         Permission writePerm = new Permission("WRITE", "DATA", "Write data");
         Permission deletePerm = new Permission("DELETE", "DATA", "Delete data");
 
-        Set<Permission> adminPerms = new HashSet<>(Set.of(readPerm, writePerm, deletePerm));
-        Set<Permission> managerPerms = new HashSet<>(Set.of(readPerm, writePerm));
-        Set<Permission> viewerPerms = new HashSet<>(Set.of(readPerm));
+        Role adminRole;
+        if (!roleManager.exists("Admin")) {
+            Set<Permission> adminPerms = new HashSet<>(Set.of(readPerm, writePerm, deletePerm));
+            adminRole = new Role("Admin", "Administrator", adminPerms);
+            roleManager.add(adminRole);
+        } else {
+            adminRole = roleManager.findByName("Admin").get();
+        }
 
-        Role adminRole = new Role("Admin", "Administrator", adminPerms);
-        Role managerRole = new Role("Manager", "Manager", managerPerms);
-        Role viewerRole = new Role("Viewer", "Viewer", viewerPerms);
+        if (!roleManager.exists("Manager")) {
+            Set<Permission> managerPerms = new HashSet<>(Set.of(readPerm, writePerm));
+            roleManager.add(new Role("Manager", "Manager", managerPerms));
+        }
 
-        if (!roleManager.exists(adminRole.getName())) roleManager.add(adminRole);
-        if (!roleManager.exists(managerRole.getName())) roleManager.add(managerRole);
-        if (!roleManager.exists(viewerRole.getName())) roleManager.add(viewerRole);
+        if (!roleManager.exists("Viewer")) {
+            Set<Permission> viewerPerms = new HashSet<>(Set.of(readPerm));
+            roleManager.add(new Role("Viewer", "Viewer", viewerPerms));
+        }
 
         User adminUser;
         if (!userManager.exists("admin")) {
