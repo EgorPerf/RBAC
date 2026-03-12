@@ -8,13 +8,13 @@ import org.example.rbac.model.Role;
 import org.example.rbac.model.RoleAssignment;
 import org.example.rbac.model.TemporaryAssignment;
 import org.example.rbac.model.User;
+import org.example.rbac.model.AuditEntry;
 import org.example.rbac.util.ValidationUtils;
 
 import java.io.File;
 import java.io.PrintWriter;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -53,6 +53,7 @@ public class CommandRegistry {
             try {
                 User user = User.create(username, fullName, email);
                 system.getUserManager().add(user);
+                system.getAuditLog().log("USER_CREATE", system.getCurrentUser(), user.username(), "Created user");
                 System.out.println("User created successfully.");
             } catch (IllegalArgumentException e) {
                 System.out.println("Error creating user: " + e.getMessage());
@@ -125,6 +126,7 @@ public class CommandRegistry {
                         system.getAssignmentManager().remove(assignment);
                     }
                     system.getUserManager().remove(user);
+                    system.getAuditLog().log("USER_DELETE", system.getCurrentUser(), user.username(), "Deleted user and assignments");
                     System.out.println("User and their assignments deleted successfully.");
                 } else {
                     System.out.println("Deletion cancelled.");
@@ -201,6 +203,7 @@ public class CommandRegistry {
             try {
                 Role role = new Role(name, description, permissions);
                 system.getRoleManager().add(role);
+                system.getAuditLog().log("ROLE_CREATE", system.getCurrentUser(), role.getName(), "Created role");
                 System.out.println("Role created successfully.");
             } catch (IllegalArgumentException e) {
                 System.out.println("Error creating role: " + e.getMessage());
@@ -299,6 +302,7 @@ public class CommandRegistry {
                     }
                     try {
                         system.getRoleManager().remove(role);
+                        system.getAuditLog().log("ROLE_DELETE", system.getCurrentUser(), role.getName(), "Deleted role");
                         System.out.println("Role deleted successfully.");
                     } catch (Exception e) {
                         System.out.println("Error deleting role: " + e.getMessage());
@@ -465,8 +469,10 @@ public class CommandRegistry {
 
                     String expiration = LocalDate.parse(dateStr).atTime(23, 59, 59).toString();
                     system.getAssignmentManager().add(new TemporaryAssignment(user, role, metadata, expiration, autoRenew));
+                    system.getAuditLog().log("ASSIGN_ROLE", system.getCurrentUser(), user.username(), "Assigned TEMPORARY role " + role.getName());
                 } else {
                     system.getAssignmentManager().add(new PermanentAssignment(user, role, metadata));
+                    system.getAuditLog().log("ASSIGN_ROLE", system.getCurrentUser(), user.username(), "Assigned PERMANENT role " + role.getName());
                 }
                 System.out.println("Role assigned successfully.");
             } catch (IllegalArgumentException e) {
@@ -503,6 +509,7 @@ public class CommandRegistry {
                 int idx = Integer.parseInt(ValidationUtils.normalizeString(scanner.nextLine())) - 1;
                 RoleAssignment toRevoke = assignments.get(idx);
                 system.getAssignmentManager().remove(toRevoke);
+                system.getAuditLog().log("REVOKE_ROLE", system.getCurrentUser(), userOpt.get().username(), "Revoked role " + toRevoke.role().getName());
                 System.out.println("Assignment revoked successfully.");
             } catch (Exception e) {
                 System.out.println("Invalid selection.");
@@ -836,6 +843,38 @@ public class CommandRegistry {
     }
 
     public static void registerUtilityCommands(CommandParser parser) {
+
+        parser.registerCommand("audit-log", "View or save the audit log", (scanner, system) -> {
+            System.out.println("Select option:");
+            System.out.println("1 - Print all");
+            System.out.println("2 - Filter by performer");
+            System.out.println("3 - Filter by action");
+            System.out.println("4 - Save to file");
+            System.out.print("Choice: ");
+            String choice = ValidationUtils.normalizeString(scanner.nextLine());
+
+            switch (choice) {
+                case "1" -> system.getAuditLog().printLog();
+                case "2" -> {
+                    System.out.print("Enter performer: ");
+                    String p = ValidationUtils.normalizeString(scanner.nextLine());
+                    system.getAuditLog().printLog(system.getAuditLog().getByPerformer(p));
+                }
+                case "3" -> {
+                    System.out.print("Enter action: ");
+                    String a = ValidationUtils.normalizeString(scanner.nextLine());
+                    system.getAuditLog().printLog(system.getAuditLog().getByAction(a));
+                }
+                case "4" -> {
+                    System.out.print("Enter filename (default: audit.txt): ");
+                    String fn = ValidationUtils.normalizeString(scanner.nextLine());
+                    if (fn.isEmpty()) fn = "audit.txt";
+                    system.getAuditLog().saveToFile(fn);
+                }
+                default -> System.out.println("Invalid choice.");
+            }
+        });
+
         parser.registerCommand("help", "Show all commands with descriptions", (scanner, system) -> {
             parser.printHelp();
         });

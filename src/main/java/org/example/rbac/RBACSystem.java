@@ -1,6 +1,7 @@
 package org.example.rbac;
 
 import org.example.rbac.manager.AssignmentManager;
+import org.example.rbac.manager.AuditLog;
 import org.example.rbac.manager.RoleManager;
 import org.example.rbac.manager.UserManager;
 import org.example.rbac.model.AssignmentMetadata;
@@ -17,12 +18,14 @@ public class RBACSystem {
     private final UserManager userManager;
     private final RoleManager roleManager;
     private final AssignmentManager assignmentManager;
+    private final AuditLog auditLog;
     private String currentUser;
 
     public RBACSystem() {
         this.userManager = new UserManager();
         this.roleManager = new RoleManager();
         this.assignmentManager = new AssignmentManager(this.userManager, this.roleManager);
+        this.auditLog = new AuditLog();
         this.currentUser = "system";
     }
 
@@ -30,6 +33,7 @@ public class RBACSystem {
         this.userManager = userManager;
         this.roleManager = roleManager;
         this.assignmentManager = assignmentManager;
+        this.auditLog = new AuditLog();
         this.currentUser = "system";
     }
 
@@ -43,6 +47,10 @@ public class RBACSystem {
 
     public AssignmentManager getAssignmentManager() {
         return assignmentManager;
+    }
+
+    public AuditLog getAuditLog() {
+        return auditLog;
     }
 
     public void setCurrentUser(String username) {
