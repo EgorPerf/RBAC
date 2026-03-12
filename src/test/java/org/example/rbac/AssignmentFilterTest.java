@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 
@@ -34,15 +35,17 @@ class AssignmentFilterTest {
         role1 = new Role("Admin", "Admin Role", new HashSet<>());
         role2 = new Role("Guest", "Guest Role", new HashSet<>());
 
-        pastDate = LocalDateTime.now().minusDays(5).toString();
-        futureDate = LocalDateTime.now().plusDays(5).toString();
-        farFutureDate = LocalDateTime.now().plusDays(10).toString();
+        pastDate = LocalDate.now().minusDays(5).toString();
+        futureDate = LocalDate.now().plusDays(5).toString();
+        farFutureDate = LocalDate.now().plusDays(10).toString();
+
+        String expiresAtDate = LocalDateTime.now().plusDays(5).toString();
 
         AssignmentMetadata meta1 = new AssignmentMetadata("sysadmin", LocalDateTime.now().minusDays(1).toString(), "Setup");
         AssignmentMetadata meta2 = new AssignmentMetadata("manager", LocalDateTime.now().minusDays(2).toString(), "Temp access");
 
         permAsgn = new PermanentAssignment(user1, role1, meta1);
-        tempAsgn = new TemporaryAssignment(user2, role2, meta2, futureDate, false);
+        tempAsgn = new TemporaryAssignment(user2, role2, meta2, expiresAtDate, false);
     }
 
     @Test

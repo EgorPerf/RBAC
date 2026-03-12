@@ -26,7 +26,7 @@ class RoleManagerTest {
         Role.clearUsedNames();
         manager = new RoleManager();
         role1 = new Role("Admin", "Admin role", new HashSet<>());
-        role2 = new Role("User", "User role", new HashSet<>());
+        role2 = new Role("AdminGuest", "User role", new HashSet<>());
         p1 = new Permission("READ", "DATA", "Read access");
     }
 
@@ -55,7 +55,7 @@ class RoleManagerTest {
         assertEquals(0, manager.count());
 
         manager.add(role2);
-        manager.setInUseChecker(r -> r.getName().equals("User"));
+        manager.setInUseChecker(r -> r.getName().equals("AdminGuest"));
         assertThrows(IllegalStateException.class, () -> manager.remove(role2));
     }
 
@@ -73,7 +73,7 @@ class RoleManagerTest {
 
         assertEquals(2, manager.findByFilter(null).size());
 
-        List<Role> sorted = manager.findAll(RoleFilters.byNameContains(""), RoleSorters.byName());
+        List<Role> sorted = manager.findAll(RoleFilters.byNameContains("Admin"), RoleSorters.byName());
         assertEquals("Admin", sorted.get(0).getName());
 
         assertThrows(IllegalArgumentException.class, () -> manager.findAll(null, RoleSorters.byName()));

@@ -79,7 +79,7 @@ public class RBACSystem {
 
         User adminUser;
         if (!userManager.exists("admin")) {
-            adminUser = User.create("admin", "System Administrator", "admin@system.local");
+            adminUser = User.create("admin", "System Administrator", "admin@system.com");
             userManager.add(adminUser);
         } else {
             adminUser = userManager.findByUsername("admin").get();
