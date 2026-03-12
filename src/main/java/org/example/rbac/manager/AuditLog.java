@@ -1,6 +1,7 @@
 package org.example.rbac.manager;
 
 import org.example.rbac.model.AuditEntry;
+import org.example.rbac.util.FormatUtils;
 import org.example.rbac.util.ValidationUtils;
 
 import java.io.PrintWriter;
@@ -47,30 +48,26 @@ public class AuditLog {
     }
 
     public void printLog(List<AuditEntry> logEntries) {
-        System.out.printf("%-20s | %-15s | %-15s | %-15s | %s%n", "Timestamp", "Action", "Performer", "Target", "Details");
-        System.out.println("-".repeat(95));
         if (logEntries.isEmpty()) {
             System.out.println("Log is empty.");
             return;
         }
-        for (AuditEntry e : logEntries) {
-            String ts = e.timestamp();
-            if (ts.length() > 19) {
-                ts = ts.substring(0, 19).replace("T", " ");
-            }
-            System.out.printf("%-20s | %-15s | %-15s | %-15s | %s%n",
-                    ts, e.action(), e.performer(), e.target(), e.details());
-        }
+        String[] headers = {"Timestamp", "Action", "Performer", "Target", "Details"};
+        List<String[]> rows = logEntries.stream().map(e -> {
+            String ts = e.timestamp().length() > 19 ? e.timestamp().substring(0, 19).replace("T", " ") : e.timestamp();
+            return new String[]{ts, e.action(), e.performer(), e.target(), FormatUtils.truncate(e.details(), 45)};
+        }).toList();
+        System.out.println(FormatUtils.formatTable(headers, rows));
     }
 
     public void saveToFile(String filename) {
         ValidationUtils.requireNonEmpty(filename, "Filename");
         try (PrintWriter writer = new PrintWriter(ValidationUtils.normalizeString(filename))) {
-            writer.printf("%-25s | %-15s | %-15s | %-15s | %s%n", "Timestamp", "Action", "Performer", "Target", "Details");
-            writer.println("-".repeat(105));
-            for (AuditEntry e : entries) {
-                writer.printf("%-25s | %-15s | %-15s | %-15s | %s%n", e.timestamp(), e.action(), e.performer(), e.target(), e.details());
-            }
+            String[] headers = {"Timestamp", "Action", "Performer", "Target", "Details"};
+            List<String[]> rows = entries.stream().map(e ->
+                    new String[]{e.timestamp(), e.action(), e.performer(), e.target(), e.details()}
+            ).toList();
+            writer.println(FormatUtils.formatTable(headers, rows));
             System.out.println("Audit log saved successfully to " + filename);
         } catch (Exception e) {
             System.out.println("Error saving audit log: " + e.getMessage());

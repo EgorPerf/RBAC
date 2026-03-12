@@ -10,6 +10,7 @@ import org.example.rbac.model.TemporaryAssignment;
 import org.example.rbac.model.User;
 import org.example.rbac.report.ReportGenerator;
 import org.example.rbac.util.ConsoleUtils;
+import org.example.rbac.util.FormatUtils;
 import org.example.rbac.util.ValidationUtils;
 
 import java.io.File;
@@ -43,8 +44,7 @@ public class CommandRegistry {
                     user.username().contains(filterStr) ||
                             user.fullName().contains(filterStr) ||
                             user.email().contains(filterStr);
-            List<User> users = system.getUserManager().findByFilter(filter);
-            printUsersTable(users);
+            printUsersTable(system.getUserManager().findByFilter(filter));
         });
 
         parser.registerCommand("user-create", "Create a new user", (scanner, system) -> {
@@ -64,28 +64,20 @@ public class CommandRegistry {
         parser.registerCommand("user-view", "View user info", (scanner, system) -> {
             String username = ConsoleUtils.promptString(scanner, "Enter username", true);
             system.getUserManager().findByUsername(username).ifPresentOrElse(user -> {
-                System.out.println(ConsoleUtils.ANSI_YELLOW + "--- User Info ---" + ConsoleUtils.ANSI_RESET);
-                System.out.println("Username: " + user.username());
-                System.out.println("Full Name: " + user.fullName());
-                System.out.println("Email: " + user.email());
+                System.out.println(ConsoleUtils.ANSI_YELLOW + FormatUtils.formatHeader("User Info") + ConsoleUtils.ANSI_RESET);
+
+                String userInfo = String.format("Username: %s\nFull Name: %s\nEmail: %s", user.username(), user.fullName(), user.email());
+                System.out.println(FormatUtils.formatBox(userInfo));
 
                 List<RoleAssignment> assignments = system.getAssignmentManager().findByUser(user);
-                System.out.println("Roles:");
-                if (assignments.isEmpty()) {
-                    System.out.println("  None");
-                } else {
-                    assignments.stream()
-                            .filter(RoleAssignment::isActive)
-                            .forEach(a -> System.out.println("  - " + a.role().getName()));
-                }
+                System.out.println(ConsoleUtils.ANSI_CYAN + "Roles:" + ConsoleUtils.ANSI_RESET);
+                if (assignments.isEmpty()) System.out.println("  None");
+                else assignments.stream().filter(RoleAssignment::isActive).forEach(a -> System.out.println("  - " + a.role().getName()));
 
                 Set<Permission> permissions = system.getAssignmentManager().getUserPermissions(user);
-                System.out.println("Permissions:");
-                if (permissions.isEmpty()) {
-                    System.out.println("  None");
-                } else {
-                    permissions.forEach(p -> System.out.println("  - " + p.name() + ":" + p.resource()));
-                }
+                System.out.println(ConsoleUtils.ANSI_CYAN + "Permissions:" + ConsoleUtils.ANSI_RESET);
+                if (permissions.isEmpty()) System.out.println("  None");
+                else permissions.forEach(p -> System.out.println("  - " + p.name() + ":" + p.resource()));
             }, () -> System.out.println(ConsoleUtils.ANSI_RED + "User not found." + ConsoleUtils.ANSI_RESET));
         });
 
@@ -173,7 +165,7 @@ public class CommandRegistry {
         parser.registerCommand("role-view", "View role info", (scanner, system) -> {
             String name = ConsoleUtils.promptString(scanner, "Enter role name", true);
             system.getRoleManager().findByName(name).ifPresentOrElse(
-                    role -> System.out.println(role.format()),
+                    role -> System.out.println(FormatUtils.formatBox(role.format())),
                     () -> System.out.println(ConsoleUtils.ANSI_RED + "Role not found." + ConsoleUtils.ANSI_RESET)
             );
         });
@@ -219,9 +211,6 @@ public class CommandRegistry {
 
                 if (!assignedUsers.isEmpty()) {
                     System.out.println(ConsoleUtils.ANSI_YELLOW + "WARNING: This role is assigned to " + assignedUsers.size() + " users." + ConsoleUtils.ANSI_RESET);
-                    for (User u : assignedUsers) {
-                        System.out.println("  - " + u.username());
-                    }
                 }
 
                 if (ConsoleUtils.promptYesNo(scanner, "Are you sure you want to delete role " + name + "?")) {
@@ -363,19 +352,15 @@ public class CommandRegistry {
         });
 
         parser.registerCommand("assignment-list", "List all assignments in the system", (scanner, system) -> {
-            System.out.printf(ConsoleUtils.ANSI_CYAN + "%-15s | %-15s | %-6s | %-8s | %-20s%n" + ConsoleUtils.ANSI_RESET,
-                    "Username", "Role", "Type", "Status", "Assigned At");
-            System.out.println("-".repeat(75));
-            int count = 0;
+            List<String[]> rows = new ArrayList<>();
             for (User u : system.getUserManager().findAll()) {
                 for (RoleAssignment a : system.getAssignmentManager().findByUser(u)) {
-                    System.out.printf("%-15s | %-15s | %-6s | %-8s | %s%n",
-                            u.username(), a.role().getName(), (a instanceof PermanentAssignment) ? "PERM" : "TEMP",
-                            a.isActive() ? "ACTIVE" : "EXPIRED", a.metadata().assignedAt().substring(0, 16).replace("T", " "));
-                    count++;
+                    rows.add(new String[]{u.username(), a.role().getName(), (a instanceof PermanentAssignment) ? "PERM" : "TEMP",
+                            a.isActive() ? "ACTIVE" : "EXPIRED", a.metadata().assignedAt().substring(0, 16).replace("T", " ")});
                 }
             }
-            if (count == 0) System.out.println("No assignments found.");
+            if (rows.isEmpty()) System.out.println("No assignments found.");
+            else System.out.println(ConsoleUtils.ANSI_CYAN + FormatUtils.formatTable(new String[]{"Username", "Role", "Type", "Status", "Assigned At"}, rows) + ConsoleUtils.ANSI_RESET);
         });
 
         parser.registerCommand("assignment-list-user", "List assignments for a user", (scanner, system) -> {
@@ -384,11 +369,9 @@ public class CommandRegistry {
                 List<RoleAssignment> assignments = system.getAssignmentManager().findByUser(u);
                 if (assignments.isEmpty()) System.out.println("No assignments found.");
                 else {
-                    System.out.printf(ConsoleUtils.ANSI_CYAN + "%-15s | %-6s | %-8s | %-20s%n" + ConsoleUtils.ANSI_RESET, "Role", "Type", "Status", "Assigned At");
-                    System.out.println("-".repeat(58));
-                    assignments.forEach(a -> System.out.printf("%-15s | %-6s | %-8s | %s%n",
-                            a.role().getName(), (a instanceof PermanentAssignment) ? "PERM" : "TEMP",
-                            a.isActive() ? "ACTIVE" : "EXPIRED", a.metadata().assignedAt().substring(0, 16).replace("T", " ")));
+                    List<String[]> rows = assignments.stream().map(a -> new String[]{a.role().getName(), (a instanceof PermanentAssignment) ? "PERM" : "TEMP",
+                            a.isActive() ? "ACTIVE" : "EXPIRED", a.metadata().assignedAt().substring(0, 16).replace("T", " ")}).toList();
+                    System.out.println(ConsoleUtils.ANSI_CYAN + FormatUtils.formatTable(new String[]{"Role", "Type", "Status", "Assigned At"}, rows) + ConsoleUtils.ANSI_RESET);
                 }
             }, () -> System.out.println(ConsoleUtils.ANSI_RED + "User not found." + ConsoleUtils.ANSI_RESET));
         });
@@ -408,35 +391,27 @@ public class CommandRegistry {
         });
 
         parser.registerCommand("assignment-active", "List all active assignments", (scanner, system) -> {
-            System.out.printf(ConsoleUtils.ANSI_CYAN + "%-15s | %-15s | %-6s | %-20s%n" + ConsoleUtils.ANSI_RESET, "Username", "Role", "Type", "Assigned At");
-            System.out.println("-".repeat(65));
-            int count = 0;
+            List<String[]> rows = new ArrayList<>();
             for (User u : system.getUserManager().findAll()) {
                 for (RoleAssignment a : system.getAssignmentManager().findByUser(u)) {
-                    if (a.isActive()) {
-                        System.out.printf("%-15s | %-15s | %-6s | %s%n",
-                                u.username(), a.role().getName(), (a instanceof PermanentAssignment) ? "PERM" : "TEMP",
-                                a.metadata().assignedAt().substring(0, 16).replace("T", " "));
-                        count++;
-                    }
+                    if (a.isActive()) rows.add(new String[]{u.username(), a.role().getName(), (a instanceof PermanentAssignment) ? "PERM" : "TEMP", a.metadata().assignedAt().substring(0, 16).replace("T", " ")});
                 }
             }
-            if (count == 0) System.out.println("No active assignments found.");
+            if (rows.isEmpty()) System.out.println("No active assignments found.");
+            else System.out.println(ConsoleUtils.ANSI_CYAN + FormatUtils.formatTable(new String[]{"Username", "Role", "Type", "Assigned At"}, rows) + ConsoleUtils.ANSI_RESET);
         });
 
         parser.registerCommand("assignment-expired", "List all expired temporary assignments", (scanner, system) -> {
-            System.out.printf(ConsoleUtils.ANSI_CYAN + "%-15s | %-15s | %-20s%n" + ConsoleUtils.ANSI_RESET, "Username", "Role", "Expired At");
-            System.out.println("-".repeat(56));
-            int count = 0;
+            List<String[]> rows = new ArrayList<>();
             for (User u : system.getUserManager().findAll()) {
                 for (RoleAssignment a : system.getAssignmentManager().findByUser(u)) {
                     if (a instanceof TemporaryAssignment ta && !a.isActive()) {
-                        System.out.printf("%-15s | %-15s | %s%n", u.username(), a.role().getName(), ta.getExpiresAt().replace("T", " "));
-                        count++;
+                        rows.add(new String[]{u.username(), a.role().getName(), ta.getExpiresAt().replace("T", " ")});
                     }
                 }
             }
-            if (count == 0) System.out.println("No expired assignments found.");
+            if (rows.isEmpty()) System.out.println("No expired assignments found.");
+            else System.out.println(ConsoleUtils.ANSI_CYAN + FormatUtils.formatTable(new String[]{"Username", "Role", "Expired At"}, rows) + ConsoleUtils.ANSI_RESET);
         });
 
         parser.registerCommand("assignment-extend", "Extend a temporary assignment", (scanner, system) -> {
@@ -513,12 +488,12 @@ public class CommandRegistry {
                 default -> new ArrayList<>();
             };
 
-            System.out.printf(ConsoleUtils.ANSI_CYAN + "%-15s | %-15s | %-6s | %-8s | %-20s%n" + ConsoleUtils.ANSI_RESET, "Username", "Role", "Type", "Status", "Assigned At");
-            System.out.println("-".repeat(75));
             if (result.isEmpty()) System.out.println("No assignments found matching criteria.");
-            else result.forEach(a -> System.out.printf("%-15s | %-15s | %-6s | %-8s | %s%n",
-                    a.user().username(), a.role().getName(), (a instanceof PermanentAssignment) ? "PERM" : "TEMP",
-                    a.isActive() ? "ACTIVE" : "EXPIRED", a.metadata().assignedAt().substring(0, 16).replace("T", " ")));
+            else {
+                List<String[]> rows = result.stream().map(a -> new String[]{a.user().username(), a.role().getName(), (a instanceof PermanentAssignment) ? "PERM" : "TEMP",
+                        a.isActive() ? "ACTIVE" : "EXPIRED", a.metadata().assignedAt().substring(0, 16).replace("T", " ")}).toList();
+                System.out.println(ConsoleUtils.ANSI_CYAN + FormatUtils.formatTable(new String[]{"Username", "Role", "Type", "Status", "Assigned At"}, rows) + ConsoleUtils.ANSI_RESET);
+            }
         });
     }
 
@@ -630,12 +605,12 @@ public class CommandRegistry {
 
             double avgRoles = userCount == 0 ? 0.0 : (double) totalAssignments / userCount;
 
-            System.out.println(ConsoleUtils.ANSI_YELLOW + "--- RBAC System Statistics ---" + ConsoleUtils.ANSI_RESET);
-            System.out.println("Users: " + userCount);
-            System.out.println("Roles: " + roleCount);
-            System.out.println("Assignments (Total/Active/Expired): " + totalAssignments + " / " + activeAssignments + " / " + expiredAssignments);
-            System.out.printf("Avg roles per user: %.2f%n", avgRoles);
-            System.out.println("Top-3 popular roles:");
+            System.out.println(ConsoleUtils.ANSI_YELLOW + FormatUtils.formatHeader("RBAC System Statistics") + ConsoleUtils.ANSI_RESET);
+            String statsText = String.format("Users: %d\nRoles: %d\nAssignments (Total/Active/Expired): %d / %d / %d\nAvg roles per user: %.2f",
+                    userCount, roleCount, totalAssignments, activeAssignments, expiredAssignments, avgRoles);
+
+            System.out.println(FormatUtils.formatBox(statsText));
+            System.out.println(ConsoleUtils.ANSI_YELLOW + "Top-3 popular roles:" + ConsoleUtils.ANSI_RESET);
 
             rolePopularity.entrySet().stream()
                     .sorted(Map.Entry.<Role, Integer>comparingByValue().reversed())
@@ -744,16 +719,26 @@ public class CommandRegistry {
     }
 
     private static void printUsersTable(List<User> users) {
-        System.out.printf(ConsoleUtils.ANSI_CYAN + "%-15s | %-25s | %-25s%n" + ConsoleUtils.ANSI_RESET, "Username", "Full Name", "Email");
-        System.out.println("-".repeat(71));
-        if (users.isEmpty()) System.out.println("No users found.");
-        else users.forEach(user -> System.out.printf("%-15s | %-25s | %-25s%n", user.username(), user.fullName(), user.email()));
+        if (users.isEmpty()) {
+            System.out.println("No users found.");
+            return;
+        }
+        String[] headers = {"Username", "Full Name", "Email"};
+        List<String[]> rows = users.stream()
+                .map(u -> new String[]{u.username(), FormatUtils.truncate(u.fullName(), 25), u.email()})
+                .toList();
+        System.out.println(ConsoleUtils.ANSI_CYAN + FormatUtils.formatTable(headers, rows) + ConsoleUtils.ANSI_RESET);
     }
 
     private static void printRolesTable(List<Role> roles) {
-        System.out.printf(ConsoleUtils.ANSI_CYAN + "%-20s | %-15s | %s%n" + ConsoleUtils.ANSI_RESET, "Name", "Permissions", "ID");
-        System.out.println("-".repeat(73));
-        if (roles.isEmpty()) System.out.println("No roles found.");
-        else roles.forEach(role -> System.out.printf("%-20s | %-15d | %s%n", role.getName(), role.getPermissions().size(), role.getId()));
+        if (roles.isEmpty()) {
+            System.out.println("No roles found.");
+            return;
+        }
+        String[] headers = {"Name", "Permissions", "ID"};
+        List<String[]> rows = roles.stream()
+                .map(r -> new String[]{r.getName(), String.valueOf(r.getPermissions().size()), r.getId()})
+                .toList();
+        System.out.println(ConsoleUtils.ANSI_CYAN + FormatUtils.formatTable(headers, rows) + ConsoleUtils.ANSI_RESET);
     }
 }

@@ -7,6 +7,7 @@ import org.example.rbac.model.Permission;
 import org.example.rbac.model.Role;
 import org.example.rbac.model.RoleAssignment;
 import org.example.rbac.model.User;
+import org.example.rbac.util.FormatUtils;
 import org.example.rbac.util.ValidationUtils;
 
 import java.io.PrintWriter;
@@ -19,39 +20,31 @@ import java.util.stream.Collectors;
 public class ReportGenerator {
 
     public String generateUserReport(UserManager userManager, AssignmentManager assignmentManager) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(String.format("%-20s | %-25s | %s%n", "Username", "Email", "Active Roles"));
-        sb.append("-".repeat(80)).append("\n");
-
+        String[] headers = {"Username", "Email", "Active Roles"};
+        List<String[]> rows = new ArrayList<>();
         for (User u : userManager.findAll()) {
             List<String> roles = assignmentManager.findByUser(u).stream()
                     .filter(RoleAssignment::isActive)
                     .map(a -> a.role().getName())
                     .toList();
             String rolesStr = roles.isEmpty() ? "None" : String.join(", ", roles);
-            sb.append(String.format("%-20s | %-25s | %s%n", u.username(), u.email(), rolesStr));
+            rows.add(new String[]{u.username(), u.email(), rolesStr});
         }
-        return sb.toString();
+        return FormatUtils.formatTable(headers, rows) + "\n";
     }
 
     public String generateRoleReport(RoleManager roleManager, AssignmentManager assignmentManager) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(String.format("%-20s | %-30s | %s%n", "Role Name", "Description", "Active Users Count"));
-        sb.append("-".repeat(75)).append("\n");
-
+        String[] headers = {"Role Name", "Description", "Active Users Count"};
+        List<String[]> rows = new ArrayList<>();
         for (Role r : roleManager.findAll()) {
-            long count = assignmentManager.findByRole(r).stream()
-                    .filter(RoleAssignment::isActive)
-                    .count();
-            sb.append(String.format("%-20s | %-30s | %d%n", r.getName(), r.getDescription(), count));
+            long count = assignmentManager.findByRole(r).stream().filter(RoleAssignment::isActive).count();
+            rows.add(new String[]{r.getName(), FormatUtils.truncate(r.getDescription(), 30), String.valueOf(count)});
         }
-        return sb.toString();
+        return FormatUtils.formatTable(headers, rows) + "\n";
     }
 
     public String generatePermissionMatrix(UserManager userManager, AssignmentManager assignmentManager) {
-        StringBuilder sb = new StringBuilder();
         Set<String> resources = new TreeSet<>();
-
         for (User u : userManager.findAll()) {
             assignmentManager.getUserPermissions(u).forEach(p -> resources.add(p.resource()));
         }
@@ -61,37 +54,33 @@ public class ReportGenerator {
         }
 
         List<String> resList = new ArrayList<>(resources);
+        String[] headers = new String[resList.size() + 1];
+        headers[0] = "User \\ Resource";
+        for (int i = 0; i < resList.size(); i++) headers[i + 1] = resList.get(i);
 
-        sb.append(String.format("%-20s", "User \\ Resource"));
-        for (String res : resList) {
-            sb.append(String.format(" | %-25s", res));
-        }
-        sb.append("\n").append("-".repeat(20 + resList.size() * 28)).append("\n");
-
+        List<String[]> rows = new ArrayList<>();
         for (User u : userManager.findAll()) {
-            sb.append(String.format("%-20s", u.username()));
+            String[] row = new String[headers.length];
+            row[0] = u.username();
             Set<Permission> perms = assignmentManager.getUserPermissions(u);
 
-            for (String res : resList) {
+            for (int i = 0; i < resList.size(); i++) {
+                String res = resList.get(i);
                 String actions = perms.stream()
                         .filter(p -> p.resource().equals(res))
                         .map(Permission::name)
                         .sorted()
                         .collect(Collectors.joining(","));
-                if (actions.isEmpty()) {
-                    actions = "-";
-                }
-                sb.append(String.format(" | %-25s", actions));
+                row[i + 1] = actions.isEmpty() ? "-" : actions;
             }
-            sb.append("\n");
+            rows.add(row);
         }
-        return sb.toString();
+        return FormatUtils.formatTable(headers, rows) + "\n";
     }
 
     public void exportToFile(String report, String filename) {
         ValidationUtils.requireNonEmpty(filename, "Filename");
-        String normFilename = ValidationUtils.normalizeString(filename);
-        try (PrintWriter writer = new PrintWriter(normFilename)) {
+        try (PrintWriter writer = new PrintWriter(ValidationUtils.normalizeString(filename))) {
             writer.print(report);
         } catch (Exception e) {
             throw new RuntimeException("Error saving report: " + e.getMessage(), e);
