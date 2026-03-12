@@ -5,6 +5,7 @@ import org.example.rbac.model.Permission;
 import org.example.rbac.model.Role;
 import org.example.rbac.util.ValidationUtils;
 
+import java.lang.reflect.Field;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -41,6 +42,17 @@ public class RoleManager implements Repository<Role> {
         }
         byId.remove(item.getId());
         byName.remove(item.getName());
+
+        try {
+            Field field = Role.class.getDeclaredField("USED_NAMES");
+            field.setAccessible(true);
+
+            @SuppressWarnings("unchecked")
+            Set<String> usedNames = (Set<String>) field.get(null);
+            usedNames.remove(ValidationUtils.normalizeString(item.getName()));
+        } catch (Exception ignored) {
+        }
+
         return true;
     }
 
@@ -66,6 +78,7 @@ public class RoleManager implements Repository<Role> {
     public void clear() {
         byId.clear();
         byName.clear();
+        Role.clearUsedNames();
     }
 
     public Optional<Role> findByName(String name) {
