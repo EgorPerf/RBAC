@@ -8,7 +8,7 @@ import org.example.rbac.model.Role;
 import org.example.rbac.model.RoleAssignment;
 import org.example.rbac.model.TemporaryAssignment;
 import org.example.rbac.model.User;
-import org.example.rbac.model.AuditEntry;
+import org.example.rbac.report.ReportGenerator;
 import org.example.rbac.util.ValidationUtils;
 
 import java.io.File;
@@ -872,6 +872,57 @@ public class CommandRegistry {
                     system.getAuditLog().saveToFile(fn);
                 }
                 default -> System.out.println("Invalid choice.");
+            }
+        });
+
+        parser.registerCommand("report-users", "Generate and save user report", (scanner, system) -> {
+            ReportGenerator generator = new ReportGenerator();
+            String report = generator.generateUserReport(system.getUserManager(), system.getAssignmentManager());
+            System.out.println(report);
+
+            System.out.print("Enter filename to save (leave empty to skip): ");
+            String filename = ValidationUtils.normalizeString(scanner.nextLine());
+            if (!filename.isEmpty()) {
+                try {
+                    generator.exportToFile(report, filename);
+                    System.out.println("Report saved successfully.");
+                } catch (Exception e) {
+                    System.out.println(e.getMessage());
+                }
+            }
+        });
+
+        parser.registerCommand("report-roles", "Generate and save role report", (scanner, system) -> {
+            ReportGenerator generator = new ReportGenerator();
+            String report = generator.generateRoleReport(system.getRoleManager(), system.getAssignmentManager());
+            System.out.println(report);
+
+            System.out.print("Enter filename to save (leave empty to skip): ");
+            String filename = ValidationUtils.normalizeString(scanner.nextLine());
+            if (!filename.isEmpty()) {
+                try {
+                    generator.exportToFile(report, filename);
+                    System.out.println("Report saved successfully.");
+                } catch (Exception e) {
+                    System.out.println(e.getMessage());
+                }
+            }
+        });
+
+        parser.registerCommand("report-matrix", "Generate and save permission matrix", (scanner, system) -> {
+            ReportGenerator generator = new ReportGenerator();
+            String report = generator.generatePermissionMatrix(system.getUserManager(), system.getAssignmentManager());
+            System.out.println(report);
+
+            System.out.print("Enter filename to save (leave empty to skip): ");
+            String filename = ValidationUtils.normalizeString(scanner.nextLine());
+            if (!filename.isEmpty()) {
+                try {
+                    generator.exportToFile(report, filename);
+                    System.out.println("Report saved successfully.");
+                } catch (Exception e) {
+                    System.out.println(e.getMessage());
+                }
             }
         });
 
