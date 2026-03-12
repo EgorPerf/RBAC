@@ -34,8 +34,9 @@ public class CommandParser {
 
     public void printHelp() {
         System.out.println("--- Available Commands ---");
-        commandDescriptions.forEach((name, desc) ->
-                System.out.println(name + " - " + desc));
+        commandDescriptions.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .forEach(entry -> System.out.println(entry.getKey() + " - " + entry.getValue()));
         System.out.println("--------------------------");
     }
 
