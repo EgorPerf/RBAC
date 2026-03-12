@@ -1,5 +1,7 @@
 package org.example.rbac.model;
 
+import org.example.rbac.util.ValidationUtils;
+
 import java.time.LocalDateTime;
 
 public class TemporaryAssignment extends AbstractRoleAssignment {
@@ -9,10 +11,9 @@ public class TemporaryAssignment extends AbstractRoleAssignment {
 
     public TemporaryAssignment(User user, Role role, AssignmentMetadata metadata, String expiresAt, boolean autoRenew) {
         super(user, role, metadata);
-        if (expiresAt == null || expiresAt.isBlank()) {
-            throw new IllegalArgumentException("Дата истечения не может быть пустой.");
-        }
-        this.expiresAt = expiresAt;
+        ValidationUtils.requireNonEmpty(expiresAt, "Дата истечения");
+
+        this.expiresAt = ValidationUtils.normalizeString(expiresAt);
         this.autoRenew = autoRenew;
     }
 
@@ -31,10 +32,13 @@ public class TemporaryAssignment extends AbstractRoleAssignment {
     }
 
     public void extend(String newExpirationDate) {
-        if (newExpirationDate == null || newExpirationDate.compareTo(expiresAt) <= 0) {
+        ValidationUtils.requireNonEmpty(newExpirationDate, "Новая дата истечения");
+        String normDate = ValidationUtils.normalizeString(newExpirationDate);
+
+        if (normDate.compareTo(expiresAt) <= 0) {
             throw new IllegalArgumentException("Новая дата должна быть позже текущей даты истечения.");
         }
-        this.expiresAt = newExpirationDate;
+        this.expiresAt = normDate;
     }
 
     @Override
@@ -52,6 +56,7 @@ public class TemporaryAssignment extends AbstractRoleAssignment {
     public boolean isAutoRenew() {
         return autoRenew;
     }
+
     public String getTimeRemaining() {
         if (isExpired()) {
             return "Time is up";

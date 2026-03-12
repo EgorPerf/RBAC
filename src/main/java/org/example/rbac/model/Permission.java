@@ -1,24 +1,21 @@
 package org.example.rbac.model;
 
+import org.example.rbac.util.ValidationUtils;
+
 public record Permission(String name, String resource, String description) {
 
     public Permission {
-        if (name == null || name.isBlank()) {
-            throw new IllegalArgumentException("Name не может быть пустым.");
-        }
+        ValidationUtils.requireNonEmpty(name, "Permission name");
+        ValidationUtils.requireNonEmpty(resource, "Resource");
+        ValidationUtils.requireNonEmpty(description, "Description");
+
+        name = ValidationUtils.normalizeString(name).toUpperCase();
         if (name.contains(" ")) {
             throw new IllegalArgumentException("Name не должно содержать пробелов.");
         }
-        name = name.toUpperCase();
 
-        if (resource == null || resource.isBlank()) {
-            throw new IllegalArgumentException("Resource не может быть пустым.");
-        }
-        resource = resource.toLowerCase();
-
-        if (description == null || description.isBlank()) {
-            throw new IllegalArgumentException("Description не может быть пустым.");
-        }
+        resource = ValidationUtils.normalizeString(resource).toLowerCase();
+        description = ValidationUtils.normalizeString(description);
     }
 
     public String format() {

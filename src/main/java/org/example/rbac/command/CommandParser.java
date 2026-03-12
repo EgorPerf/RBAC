@@ -1,6 +1,7 @@
 package org.example.rbac.command;
 
 import org.example.rbac.RBACSystem;
+import org.example.rbac.util.ValidationUtils;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -12,19 +13,23 @@ public class CommandParser {
     private final Map<String, String> commandDescriptions = new HashMap<>();
 
     public void registerCommand(String name, String description, Command command) {
-        if (name == null || description == null || command == null) {
+        ValidationUtils.requireNonEmpty(name, "Command name");
+        ValidationUtils.requireNonEmpty(description, "Command description");
+        if (command == null) {
             throw new IllegalArgumentException();
         }
-        commands.put(name, command);
-        commandDescriptions.put(name, description);
+        String normName = ValidationUtils.normalizeString(name);
+        commands.put(normName, command);
+        commandDescriptions.put(normName, ValidationUtils.normalizeString(description));
     }
 
     public void executeCommand(String commandName, Scanner scanner, RBACSystem system) {
-        if (commandName == null || !commands.containsKey(commandName)) {
+        String normName = ValidationUtils.normalizeString(commandName);
+        if (normName.isEmpty() || !commands.containsKey(normName)) {
             System.out.println("Unknown command: " + commandName);
             return;
         }
-        commands.get(commandName).execute(scanner, system);
+        commands.get(normName).execute(scanner, system);
     }
 
     public void printHelp() {
@@ -35,10 +40,11 @@ public class CommandParser {
     }
 
     public void parseAndExecute(String input, Scanner scanner, RBACSystem system) {
-        if (input == null || input.trim().isEmpty()) {
+        String normInput = ValidationUtils.normalizeString(input);
+        if (normInput.isEmpty()) {
             return;
         }
-        String[] parts = input.trim().split("\\s+", 2);
+        String[] parts = normInput.split("\\s+", 2);
         executeCommand(parts[0], scanner, system);
     }
 }

@@ -3,6 +3,7 @@ package org.example.rbac.manager;
 import org.example.rbac.filter.RoleFilter;
 import org.example.rbac.model.Permission;
 import org.example.rbac.model.Role;
+import org.example.rbac.util.ValidationUtils;
 
 import java.util.*;
 import java.util.function.Predicate;
@@ -45,10 +46,10 @@ public class RoleManager implements Repository<Role> {
 
     @Override
     public Optional<Role> findById(String id) {
-        if (id == null) {
+        if (id == null || id.trim().isEmpty()) {
             return Optional.empty();
         }
-        return Optional.ofNullable(byId.get(id));
+        return Optional.ofNullable(byId.get(ValidationUtils.normalizeString(id)));
     }
 
     @Override
@@ -68,10 +69,10 @@ public class RoleManager implements Repository<Role> {
     }
 
     public Optional<Role> findByName(String name) {
-        if (name == null) {
+        if (name == null || name.trim().isEmpty()) {
             return Optional.empty();
         }
-        return Optional.ofNullable(byName.get(name));
+        return Optional.ofNullable(byName.get(ValidationUtils.normalizeString(name)));
     }
 
     public List<Role> findByFilter(RoleFilter filter) {
@@ -94,17 +95,18 @@ public class RoleManager implements Repository<Role> {
     }
 
     public boolean exists(String name) {
-        if (name == null) {
+        if (name == null || name.trim().isEmpty()) {
             return false;
         }
-        return byName.containsKey(name);
+        return byName.containsKey(ValidationUtils.normalizeString(name));
     }
 
     public void addPermissionToRole(String roleName, Permission permission) {
-        if (roleName == null || permission == null) {
+        ValidationUtils.requireNonEmpty(roleName, "Role name");
+        if (permission == null) {
             throw new IllegalArgumentException();
         }
-        Role role = byName.get(roleName);
+        Role role = byName.get(ValidationUtils.normalizeString(roleName));
         if (role == null) {
             throw new IllegalArgumentException();
         }
@@ -112,10 +114,11 @@ public class RoleManager implements Repository<Role> {
     }
 
     public void removePermissionFromRole(String roleName, Permission permission) {
-        if (roleName == null || permission == null) {
+        ValidationUtils.requireNonEmpty(roleName, "Role name");
+        if (permission == null) {
             throw new IllegalArgumentException();
         }
-        Role role = byName.get(roleName);
+        Role role = byName.get(ValidationUtils.normalizeString(roleName));
         if (role == null) {
             throw new IllegalArgumentException();
         }
@@ -123,11 +126,14 @@ public class RoleManager implements Repository<Role> {
     }
 
     public List<Role> findRolesWithPermission(String permissionName, String resource) {
-        if (permissionName == null || resource == null) {
-            throw new IllegalArgumentException();
-        }
+        ValidationUtils.requireNonEmpty(permissionName, "Permission name");
+        ValidationUtils.requireNonEmpty(resource, "Resource");
+
+        String normName = ValidationUtils.normalizeString(permissionName).toUpperCase();
+        String normRes = ValidationUtils.normalizeString(resource).toLowerCase();
+
         return byId.values().stream()
-                .filter(role -> role.hasPermission(permissionName, resource))
+                .filter(role -> role.hasPermission(normName, normRes))
                 .collect(Collectors.toList());
     }
 

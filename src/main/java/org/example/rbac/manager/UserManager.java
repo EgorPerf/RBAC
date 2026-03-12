@@ -2,6 +2,7 @@ package org.example.rbac.manager;
 
 import org.example.rbac.filter.UserFilter;
 import org.example.rbac.model.User;
+import org.example.rbac.util.ValidationUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -50,18 +51,19 @@ public class UserManager implements Repository<User> {
     }
 
     public Optional<User> findByUsername(String username) {
-        if (username == null) {
+        if (username == null || username.trim().isEmpty()) {
             return Optional.empty();
         }
-        return Optional.ofNullable(users.get(username));
+        return Optional.ofNullable(users.get(ValidationUtils.normalizeString(username)));
     }
 
     public Optional<User> findByEmail(String email) {
-        if (email == null) {
+        if (email == null || email.trim().isEmpty()) {
             return Optional.empty();
         }
+        String normEmail = ValidationUtils.normalizeString(email);
         return users.values().stream()
-                .filter(u -> u.email().equals(email))
+                .filter(u -> u.email().equals(normEmail))
                 .findFirst();
     }
 
@@ -85,18 +87,21 @@ public class UserManager implements Repository<User> {
     }
 
     public boolean exists(String username) {
-        if (username == null) {
+        if (username == null || username.trim().isEmpty()) {
             return false;
         }
-        return users.containsKey(username);
+        return users.containsKey(ValidationUtils.normalizeString(username));
     }
 
     public void update(String username, String newFullName, String newEmail) {
-        if (username == null || !users.containsKey(username)) {
+        ValidationUtils.requireNonEmpty(username, "Username");
+        String normUsername = ValidationUtils.normalizeString(username);
+
+        if (!users.containsKey(normUsername)) {
             throw new IllegalArgumentException();
         }
-        User updatedUser = User.create(username, newFullName, newEmail);
-        users.put(username, updatedUser);
+        User updatedUser = User.create(normUsername, newFullName, newEmail);
+        users.put(normUsername, updatedUser);
     }
 
     @Override

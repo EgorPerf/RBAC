@@ -8,6 +8,7 @@ import org.example.rbac.model.Role;
 import org.example.rbac.model.RoleAssignment;
 import org.example.rbac.model.TemporaryAssignment;
 import org.example.rbac.model.User;
+import org.example.rbac.util.ValidationUtils;
 
 import java.io.File;
 import java.io.PrintWriter;
@@ -30,7 +31,7 @@ public class CommandRegistry {
 
         parser.registerCommand("user-list", "List all users or filter by keyword", (scanner, system) -> {
             System.out.print("Enter filter (leave empty for all): ");
-            String filterStr = scanner.nextLine().trim();
+            String filterStr = ValidationUtils.normalizeString(scanner.nextLine());
 
             UserFilter filter = filterStr.isEmpty() ? null : user ->
                     user.username().contains(filterStr) ||
@@ -43,24 +44,24 @@ public class CommandRegistry {
 
         parser.registerCommand("user-create", "Create a new user", (scanner, system) -> {
             System.out.print("Enter username: ");
-            String username = scanner.nextLine().trim();
+            String username = ValidationUtils.normalizeString(scanner.nextLine());
             System.out.print("Enter full name: ");
-            String fullName = scanner.nextLine().trim();
+            String fullName = ValidationUtils.normalizeString(scanner.nextLine());
             System.out.print("Enter email: ");
-            String email = scanner.nextLine().trim();
+            String email = ValidationUtils.normalizeString(scanner.nextLine());
 
             try {
                 User user = User.create(username, fullName, email);
                 system.getUserManager().add(user);
                 System.out.println("User created successfully.");
             } catch (IllegalArgumentException e) {
-                System.out.println("Error creating user: Invalid data or user already exists.");
+                System.out.println("Error creating user: " + e.getMessage());
             }
         });
 
         parser.registerCommand("user-view", "View user info", (scanner, system) -> {
             System.out.print("Enter username: ");
-            String username = scanner.nextLine().trim();
+            String username = ValidationUtils.normalizeString(scanner.nextLine());
 
             system.getUserManager().findByUsername(username).ifPresentOrElse(user -> {
                 System.out.println("--- User Info ---");
@@ -90,7 +91,7 @@ public class CommandRegistry {
 
         parser.registerCommand("user-update", "Update user data", (scanner, system) -> {
             System.out.print("Enter username: ");
-            String username = scanner.nextLine().trim();
+            String username = ValidationUtils.normalizeString(scanner.nextLine());
 
             if (!system.getUserManager().exists(username)) {
                 System.out.println("User not found.");
@@ -98,25 +99,25 @@ public class CommandRegistry {
             }
 
             System.out.print("Enter new full name: ");
-            String fullName = scanner.nextLine().trim();
+            String fullName = ValidationUtils.normalizeString(scanner.nextLine());
             System.out.print("Enter new email: ");
-            String email = scanner.nextLine().trim();
+            String email = ValidationUtils.normalizeString(scanner.nextLine());
 
             try {
                 system.getUserManager().update(username, fullName, email);
                 System.out.println("User updated successfully.");
             } catch (IllegalArgumentException e) {
-                System.out.println("Error updating user: Invalid data.");
+                System.out.println("Error updating user: " + e.getMessage());
             }
         });
 
         parser.registerCommand("user-delete", "Delete a user", (scanner, system) -> {
             System.out.print("Enter username: ");
-            String username = scanner.nextLine().trim();
+            String username = ValidationUtils.normalizeString(scanner.nextLine());
 
             system.getUserManager().findByUsername(username).ifPresentOrElse(user -> {
                 System.out.print("Are you sure? Type 'да' to confirm: ");
-                String confirmation = scanner.nextLine().trim();
+                String confirmation = ValidationUtils.normalizeString(scanner.nextLine());
 
                 if ("да".equalsIgnoreCase(confirmation)) {
                     List<RoleAssignment> assignments = new ArrayList<>(system.getAssignmentManager().findByUser(user));
@@ -138,10 +139,10 @@ public class CommandRegistry {
             System.out.println("3 - By email domain");
             System.out.println("4 - By full name (contains)");
             System.out.print("Choice: ");
-            String choice = scanner.nextLine().trim();
+            String choice = ValidationUtils.normalizeString(scanner.nextLine());
 
             System.out.print("Enter search string: ");
-            String query = scanner.nextLine().trim();
+            String query = ValidationUtils.normalizeString(scanner.nextLine());
 
             UserFilter filter = switch (choice) {
                 case "1" -> user -> user.username().contains(query);
@@ -170,25 +171,25 @@ public class CommandRegistry {
 
         parser.registerCommand("role-create", "Create a new role", (scanner, system) -> {
             System.out.print("Enter role name: ");
-            String name = scanner.nextLine().trim();
+            String name = ValidationUtils.normalizeString(scanner.nextLine());
             System.out.print("Enter role description: ");
-            String description = scanner.nextLine().trim();
+            String description = ValidationUtils.normalizeString(scanner.nextLine());
 
             Set<Permission> permissions = new HashSet<>();
             while (true) {
                 System.out.print("Add a permission? (да/нет): ");
-                String answer = scanner.nextLine().trim().toLowerCase();
+                String answer = ValidationUtils.normalizeString(scanner.nextLine()).toLowerCase();
                 if (!answer.equals("да") && !answer.equals("yes") && !answer.equals("y") && !answer.equals("1")) {
                     break;
                 }
 
                 try {
                     System.out.print("  Permission name (e.g. READ): ");
-                    String pName = scanner.nextLine().trim();
+                    String pName = ValidationUtils.normalizeString(scanner.nextLine());
                     System.out.print("  Resource (e.g. DATA): ");
-                    String pResource = scanner.nextLine().trim();
+                    String pResource = ValidationUtils.normalizeString(scanner.nextLine());
                     System.out.print("  Description: ");
-                    String pDesc = scanner.nextLine().trim();
+                    String pDesc = ValidationUtils.normalizeString(scanner.nextLine());
 
                     permissions.add(new Permission(pName, pResource, pDesc));
                     System.out.println("  Permission added.");
@@ -208,7 +209,7 @@ public class CommandRegistry {
 
         parser.registerCommand("role-view", "View role info", (scanner, system) -> {
             System.out.print("Enter role name: ");
-            String name = scanner.nextLine().trim();
+            String name = ValidationUtils.normalizeString(scanner.nextLine());
 
             system.getRoleManager().findByName(name).ifPresentOrElse(
                     role -> System.out.println(role.format()),
@@ -218,15 +219,16 @@ public class CommandRegistry {
 
         parser.registerCommand("role-update", "Update a role (name/description)", (scanner, system) -> {
             System.out.print("Enter role name to update: ");
-            String oldName = scanner.nextLine().trim();
+            String oldName = ValidationUtils.normalizeString(scanner.nextLine());
 
             system.getRoleManager().findByName(oldName).ifPresentOrElse(role -> {
                 System.out.print("Enter new role name: ");
-                String newName = scanner.nextLine().trim();
+                String newName = ValidationUtils.normalizeString(scanner.nextLine());
                 System.out.print("Enter new description: ");
-                String newDesc = scanner.nextLine().trim();
+                String newDesc = ValidationUtils.normalizeString(scanner.nextLine());
 
-                if (!oldName.equals(newName) && system.getRoleManager().exists(newName)) {
+                if (!oldName.equalsIgnoreCase(newName) &&
+                        system.getRoleManager().exists(newName)) {
                     System.out.println("Error: Role with this name already exists.");
                     return;
                 }
@@ -263,7 +265,7 @@ public class CommandRegistry {
 
         parser.registerCommand("role-delete", "Delete a role", (scanner, system) -> {
             System.out.print("Enter role name: ");
-            String name = scanner.nextLine().trim();
+            String name = ValidationUtils.normalizeString(scanner.nextLine());
 
             system.getRoleManager().findByName(name).ifPresentOrElse(role -> {
                 List<User> assignedUsers = new ArrayList<>();
@@ -284,7 +286,7 @@ public class CommandRegistry {
                 }
 
                 System.out.print("Are you sure? Type 'да' to confirm: ");
-                String confirmation = scanner.nextLine().trim();
+                String confirmation = ValidationUtils.normalizeString(scanner.nextLine());
 
                 if ("да".equalsIgnoreCase(confirmation)) {
                     for (User u : assignedUsers) {
@@ -309,7 +311,7 @@ public class CommandRegistry {
 
         parser.registerCommand("role-add-permission", "Add a permission to a role", (scanner, system) -> {
             System.out.print("Enter role name: ");
-            String name = scanner.nextLine().trim();
+            String name = ValidationUtils.normalizeString(scanner.nextLine());
 
             if (!system.getRoleManager().exists(name)) {
                 System.out.println("Role not found.");
@@ -317,11 +319,11 @@ public class CommandRegistry {
             }
 
             System.out.print("Enter permission name (e.g. READ): ");
-            String pName = scanner.nextLine().trim();
+            String pName = ValidationUtils.normalizeString(scanner.nextLine());
             System.out.print("Enter resource (e.g. DATA): ");
-            String pResource = scanner.nextLine().trim();
+            String pResource = ValidationUtils.normalizeString(scanner.nextLine());
             System.out.print("Enter description: ");
-            String pDesc = scanner.nextLine().trim();
+            String pDesc = ValidationUtils.normalizeString(scanner.nextLine());
 
             try {
                 Permission permission = new Permission(pName, pResource, pDesc);
@@ -334,7 +336,7 @@ public class CommandRegistry {
 
         parser.registerCommand("role-remove-permission", "Remove a permission from a role", (scanner, system) -> {
             System.out.print("Enter role name: ");
-            String name = scanner.nextLine().trim();
+            String name = ValidationUtils.normalizeString(scanner.nextLine());
 
             system.getRoleManager().findByName(name).ifPresentOrElse(role -> {
                 List<Permission> perms = new ArrayList<>(role.getPermissions());
@@ -350,7 +352,7 @@ public class CommandRegistry {
 
                 System.out.print("Enter permission number to remove: ");
                 try {
-                    int index = Integer.parseInt(scanner.nextLine().trim()) - 1;
+                    int index = Integer.parseInt(ValidationUtils.normalizeString(scanner.nextLine())) - 1;
                     if (index >= 0 && index < perms.size()) {
                         Permission toRemove = perms.get(index);
                         system.getRoleManager().removePermissionFromRole(name, toRemove);
@@ -370,7 +372,7 @@ public class CommandRegistry {
             System.out.println("2 - By specific permission (name)");
             System.out.println("3 - By minimum number of permissions");
             System.out.print("Choice: ");
-            String choice = scanner.nextLine().trim();
+            String choice = ValidationUtils.normalizeString(scanner.nextLine());
 
             List<Role> roles = system.getRoleManager().findAll();
             List<Role> result;
@@ -378,19 +380,19 @@ public class CommandRegistry {
             switch (choice) {
                 case "1" -> {
                     System.out.print("Enter name query: ");
-                    String query = scanner.nextLine().trim();
+                    String query = ValidationUtils.normalizeString(scanner.nextLine());
                     result = roles.stream().filter(r -> r.getName().contains(query)).toList();
                 }
                 case "2" -> {
                     System.out.print("Enter permission name (e.g. READ): ");
-                    String query = scanner.nextLine().trim().toUpperCase();
+                    String query = ValidationUtils.normalizeString(scanner.nextLine()).toUpperCase();
                     result = roles.stream().filter(r -> r.getPermissions().stream()
                             .anyMatch(p -> p.name().contains(query))).toList();
                 }
                 case "3" -> {
                     System.out.print("Enter minimum number of permissions: ");
                     try {
-                        int min = Integer.parseInt(scanner.nextLine().trim());
+                        int min = Integer.parseInt(ValidationUtils.normalizeString(scanner.nextLine()));
                         result = roles.stream().filter(r -> r.getPermissions().size() >= min).toList();
                     } catch (NumberFormatException e) {
                         System.out.println("Invalid number.");
@@ -410,7 +412,7 @@ public class CommandRegistry {
 
         parser.registerCommand("assign-role", "Assign a role to a user", (scanner, system) -> {
             System.out.print("Enter username: ");
-            String username = scanner.nextLine().trim();
+            String username = ValidationUtils.normalizeString(scanner.nextLine());
 
             var userOpt = system.getUserManager().findByUsername(username);
             if (userOpt.isEmpty()) {
@@ -433,7 +435,7 @@ public class CommandRegistry {
             System.out.print("Select role number: ");
             int roleIdx;
             try {
-                roleIdx = Integer.parseInt(scanner.nextLine().trim()) - 1;
+                roleIdx = Integer.parseInt(ValidationUtils.normalizeString(scanner.nextLine())) - 1;
                 if (roleIdx < 0 || roleIdx >= roles.size()) throw new Exception();
             } catch (Exception e) {
                 System.out.println("Invalid role selection.");
@@ -442,18 +444,24 @@ public class CommandRegistry {
             Role role = roles.get(roleIdx);
 
             System.out.print("Assignment type (1 - Permanent, 2 - Temporary): ");
-            String typeChoice = scanner.nextLine().trim();
+            String typeChoice = ValidationUtils.normalizeString(scanner.nextLine());
 
             System.out.print("Enter reason for assignment: ");
-            String reason = scanner.nextLine().trim();
+            String reason = ValidationUtils.normalizeString(scanner.nextLine());
             AssignmentMetadata metadata = AssignmentMetadata.now("admin", reason);
 
             try {
                 if ("2".equals(typeChoice)) {
                     System.out.print("Enter expiration date (YYYY-MM-DD): ");
-                    String dateStr = scanner.nextLine().trim();
+                    String dateStr = ValidationUtils.normalizeString(scanner.nextLine());
+
+                    if (!ValidationUtils.isValidDate(dateStr)) {
+                        System.out.println("Invalid date format. Please use YYYY-MM-DD.");
+                        return;
+                    }
+
                     System.out.print("Auto-renew? (да/нет): ");
-                    boolean autoRenew = scanner.nextLine().trim().equalsIgnoreCase("да");
+                    boolean autoRenew = ValidationUtils.normalizeString(scanner.nextLine()).equalsIgnoreCase("да");
 
                     String expiration = LocalDate.parse(dateStr).atTime(23, 59, 59).toString();
                     system.getAssignmentManager().add(new TemporaryAssignment(user, role, metadata, expiration, autoRenew));
@@ -461,8 +469,6 @@ public class CommandRegistry {
                     system.getAssignmentManager().add(new PermanentAssignment(user, role, metadata));
                 }
                 System.out.println("Role assigned successfully.");
-            } catch (DateTimeParseException e) {
-                System.out.println("Invalid date format. Please use YYYY-MM-DD.");
             } catch (IllegalArgumentException e) {
                 System.out.println("Error: " + e.getMessage());
             }
@@ -470,7 +476,7 @@ public class CommandRegistry {
 
         parser.registerCommand("revoke-role", "Revoke a role from a user", (scanner, system) -> {
             System.out.print("Enter username: ");
-            String username = scanner.nextLine().trim();
+            String username = ValidationUtils.normalizeString(scanner.nextLine());
 
             var userOpt = system.getUserManager().findByUsername(username);
             if (userOpt.isEmpty()) {
@@ -494,7 +500,7 @@ public class CommandRegistry {
 
             System.out.print("Select assignment number to revoke: ");
             try {
-                int idx = Integer.parseInt(scanner.nextLine().trim()) - 1;
+                int idx = Integer.parseInt(ValidationUtils.normalizeString(scanner.nextLine())) - 1;
                 RoleAssignment toRevoke = assignments.get(idx);
                 system.getAssignmentManager().remove(toRevoke);
                 System.out.println("Assignment revoked successfully.");
@@ -532,7 +538,7 @@ public class CommandRegistry {
 
         parser.registerCommand("assignment-list-user", "List assignments for a specific user", (scanner, system) -> {
             System.out.print("Enter username: ");
-            String username = scanner.nextLine().trim();
+            String username = ValidationUtils.normalizeString(scanner.nextLine());
             system.getUserManager().findByUsername(username).ifPresentOrElse(u -> {
                 List<RoleAssignment> assignments = system.getAssignmentManager().findByUser(u);
                 if (assignments.isEmpty()) {
@@ -555,7 +561,7 @@ public class CommandRegistry {
 
         parser.registerCommand("assignment-list-role", "List users with a specific role", (scanner, system) -> {
             System.out.print("Enter role name: ");
-            String roleName = scanner.nextLine().trim();
+            String roleName = ValidationUtils.normalizeString(scanner.nextLine());
             system.getRoleManager().findByName(roleName).ifPresentOrElse(r -> {
                 List<User> users = system.getUserManager().findAll();
                 boolean found = false;
@@ -626,9 +632,9 @@ public class CommandRegistry {
 
         parser.registerCommand("assignment-extend", "Extend a temporary assignment", (scanner, system) -> {
             System.out.print("Enter username: ");
-            String username = scanner.nextLine().trim();
+            String username = ValidationUtils.normalizeString(scanner.nextLine());
             System.out.print("Enter role name: ");
-            String roleName = scanner.nextLine().trim();
+            String roleName = ValidationUtils.normalizeString(scanner.nextLine());
 
             var userOpt = system.getUserManager().findByUsername(username);
             var roleOpt = system.getRoleManager().findByName(roleName);
@@ -658,13 +664,17 @@ public class CommandRegistry {
             }
 
             System.out.print("Enter new expiration date (YYYY-MM-DD): ");
-            String dateStr = scanner.nextLine().trim();
+            String dateStr = ValidationUtils.normalizeString(scanner.nextLine());
+
+            if (!ValidationUtils.isValidDate(dateStr)) {
+                System.out.println("Invalid date format. Please use YYYY-MM-DD.");
+                return;
+            }
+
             try {
                 String newExp = LocalDate.parse(dateStr).atTime(23, 59, 59).toString();
                 ((TemporaryAssignment) target).extend(newExp);
                 System.out.println("Assignment extended successfully.");
-            } catch (DateTimeParseException e) {
-                System.out.println("Invalid date format. Please use YYYY-MM-DD.");
             } catch (IllegalArgumentException e) {
                 System.out.println("Error: " + e.getMessage());
             }
@@ -679,7 +689,7 @@ public class CommandRegistry {
             System.out.println("5 - Assigned after date");
             System.out.println("6 - Expires before date");
             System.out.print("Choice: ");
-            String choice = scanner.nextLine().trim();
+            String choice = ValidationUtils.normalizeString(scanner.nextLine());
 
             List<RoleAssignment> allAssignments = new ArrayList<>();
             List<User> allUsers = system.getUserManager().findAll();
@@ -691,17 +701,17 @@ public class CommandRegistry {
             switch (choice) {
                 case "1" -> {
                     System.out.print("Enter username: ");
-                    String un = scanner.nextLine().trim();
+                    String un = ValidationUtils.normalizeString(scanner.nextLine());
                     result = allAssignments.stream().filter(a -> a.user().username().equals(un)).toList();
                 }
                 case "2" -> {
                     System.out.print("Enter role name: ");
-                    String rn = scanner.nextLine().trim();
+                    String rn = ValidationUtils.normalizeString(scanner.nextLine());
                     result = allAssignments.stream().filter(a -> a.role().getName().equals(rn)).toList();
                 }
                 case "3" -> {
                     System.out.print("Enter type (PERM/TEMP): ");
-                    String t = scanner.nextLine().trim().toUpperCase();
+                    String t = ValidationUtils.normalizeString(scanner.nextLine()).toUpperCase();
                     result = allAssignments.stream().filter(a -> {
                         String at = (a instanceof PermanentAssignment) ? "PERM" : "TEMP";
                         return at.equals(t);
@@ -709,7 +719,7 @@ public class CommandRegistry {
                 }
                 case "4" -> {
                     System.out.print("Enter status (ACTIVE/EXPIRED): ");
-                    String s = scanner.nextLine().trim().toUpperCase();
+                    String s = ValidationUtils.normalizeString(scanner.nextLine()).toUpperCase();
                     result = allAssignments.stream().filter(a -> {
                         String as = a.isActive() ? "ACTIVE" : "EXPIRED";
                         return as.equals(s);
@@ -717,32 +727,32 @@ public class CommandRegistry {
                 }
                 case "5" -> {
                     System.out.print("Enter assigned after date (YYYY-MM-DD): ");
-                    try {
-                        LocalDateTime dt = LocalDate.parse(scanner.nextLine().trim()).atStartOfDay();
-                        result = allAssignments.stream().filter(a -> {
-                            LocalDateTime assignedDt = LocalDateTime.parse(a.metadata().assignedAt().toString());
-                            return assignedDt.isAfter(dt);
-                        }).toList();
-                    } catch (Exception e) {
+                    String inputDate = ValidationUtils.normalizeString(scanner.nextLine());
+                    if (!ValidationUtils.isValidDate(inputDate)) {
                         System.out.println("Invalid date.");
                         return;
                     }
+                    LocalDateTime dt = LocalDate.parse(inputDate).atStartOfDay();
+                    result = allAssignments.stream().filter(a -> {
+                        LocalDateTime assignedDt = LocalDateTime.parse(a.metadata().assignedAt().toString());
+                        return assignedDt.isAfter(dt);
+                    }).toList();
                 }
                 case "6" -> {
                     System.out.print("Enter expires before date (YYYY-MM-DD): ");
-                    try {
-                        LocalDateTime dt = LocalDate.parse(scanner.nextLine().trim()).atTime(23, 59, 59);
-                        result = allAssignments.stream().filter(a -> {
-                            if (a instanceof TemporaryAssignment) {
-                                LocalDateTime exp = LocalDateTime.parse(((TemporaryAssignment) a).getExpiresAt());
-                                return exp.isBefore(dt);
-                            }
-                            return false;
-                        }).toList();
-                    } catch (Exception e) {
+                    String inputDate = ValidationUtils.normalizeString(scanner.nextLine());
+                    if (!ValidationUtils.isValidDate(inputDate)) {
                         System.out.println("Invalid date.");
                         return;
                     }
+                    LocalDateTime dt = LocalDate.parse(inputDate).atTime(23, 59, 59);
+                    result = allAssignments.stream().filter(a -> {
+                        if (a instanceof TemporaryAssignment) {
+                            LocalDateTime exp = LocalDateTime.parse(((TemporaryAssignment) a).getExpiresAt());
+                            return exp.isBefore(dt);
+                        }
+                        return false;
+                    }).toList();
                 }
                 default -> {
                     System.out.println("Invalid choice.");
@@ -774,7 +784,7 @@ public class CommandRegistry {
 
         parser.registerCommand("permissions-user", "List all permissions of a user grouped by resource", (scanner, system) -> {
             System.out.print("Enter username: ");
-            String username = scanner.nextLine().trim();
+            String username = ValidationUtils.normalizeString(scanner.nextLine());
 
             system.getUserManager().findByUsername(username).ifPresentOrElse(u -> {
                 Set<Permission> perms = system.getAssignmentManager().getUserPermissions(u);
@@ -799,13 +809,13 @@ public class CommandRegistry {
 
         parser.registerCommand("permissions-check", "Check if user has specific permission", (scanner, system) -> {
             System.out.print("Enter username: ");
-            String username = scanner.nextLine().trim();
+            String username = ValidationUtils.normalizeString(scanner.nextLine());
 
             system.getUserManager().findByUsername(username).ifPresentOrElse(u -> {
                 System.out.print("Enter permission name: ");
-                String pName = scanner.nextLine().trim();
+                String pName = ValidationUtils.normalizeString(scanner.nextLine());
                 System.out.print("Enter resource: ");
-                String pRes = scanner.nextLine().trim();
+                String pRes = ValidationUtils.normalizeString(scanner.nextLine());
 
                 boolean hasPerm = system.getAssignmentManager().userHasPermission(u, pName, pRes);
 
@@ -876,7 +886,7 @@ public class CommandRegistry {
 
         parser.registerCommand("save", "Save data to file", (scanner, system) -> {
             System.out.print("Enter filename (default: rbac.txt): ");
-            String filename = scanner.nextLine().trim();
+            String filename = ValidationUtils.normalizeString(scanner.nextLine());
             if (filename.isEmpty()) filename = "rbac.txt";
             try (PrintWriter writer = new PrintWriter(filename)) {
                 writer.println("[USERS]");
@@ -911,7 +921,7 @@ public class CommandRegistry {
 
         parser.registerCommand("load", "Load data from file", (scanner, system) -> {
             System.out.print("Enter filename (default: rbac.txt): ");
-            String filename = scanner.nextLine().trim();
+            String filename = ValidationUtils.normalizeString(scanner.nextLine());
             if (filename.isEmpty()) filename = "rbac.txt";
             try (Scanner fileScanner = new Scanner(new File(filename))) {
                 String section = "";
@@ -965,10 +975,10 @@ public class CommandRegistry {
 
         parser.registerCommand("exit", "Exit the program", (scanner, system) -> {
             System.out.print("Are you sure you want to exit? (да/нет): ");
-            String confirmation = scanner.nextLine().trim();
+            String confirmation = ValidationUtils.normalizeString(scanner.nextLine());
             if ("да".equalsIgnoreCase(confirmation)) {
                 System.out.print("Save data before exiting? (да/нет): ");
-                String saveConfirm = scanner.nextLine().trim();
+                String saveConfirm = ValidationUtils.normalizeString(scanner.nextLine());
                 if ("да".equalsIgnoreCase(saveConfirm)) {
                     try {
                         parser.executeCommand("save", scanner, system);

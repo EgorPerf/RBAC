@@ -1,5 +1,7 @@
 package org.example.rbac.model;
 
+import org.example.rbac.util.ValidationUtils;
+
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Objects;
@@ -16,24 +18,21 @@ public class Role {
     private final Set<Permission> permissions;
 
     public Role(String name, String description, Set<Permission> permissions) {
-        if (name == null || name.isBlank()) {
-            throw new IllegalArgumentException("Name не может быть пустым.");
-        }
-        if (description == null || description.isBlank()) {
-            throw new IllegalArgumentException("Description не может быть пустым.");
-        }
+        ValidationUtils.requireNonEmpty(name, "Name");
+        ValidationUtils.requireNonEmpty(description, "Description");
+
         if (permissions == null) {
             throw new IllegalArgumentException("Permissions не может быть null.");
         }
 
-        String trimmedName = name.trim();
+        String trimmedName = ValidationUtils.normalizeString(name);
         if (!USED_NAMES.add(trimmedName)) {
             throw new IllegalArgumentException("Роль с таким именем уже существует.");
         }
 
         this.id = "role_" + UUID.randomUUID().toString();
         this.name = trimmedName;
-        this.description = description.trim();
+        this.description = ValidationUtils.normalizeString(description);
         this.permissions = permissions;
     }
 
@@ -56,8 +55,11 @@ public class Role {
     public boolean hasPermission(String permissionName, String resource) {
         if (permissionName == null || resource == null) return false;
 
+        String normName = ValidationUtils.normalizeString(permissionName);
+        String normRes = ValidationUtils.normalizeString(resource);
+
         return permissions.stream()
-                .anyMatch(p -> p.matches(permissionName, resource));
+                .anyMatch(p -> p.matches(normName, normRes));
     }
 
     public Set<Permission> getPermissions() {
@@ -111,6 +113,7 @@ public class Role {
 
         return sb.toString();
     }
+
     public static void clearUsedNames() {
         USED_NAMES.clear();
     }
