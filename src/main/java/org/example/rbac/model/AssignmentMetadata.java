@@ -1,25 +1,20 @@
 package org.example.rbac.model;
 
-import org.example.rbac.util.ValidationUtils;
-
-import java.time.LocalDateTime;
+import org.example.rbac.util.DateUtils;
 
 public record AssignmentMetadata(String assignedBy, String assignedAt, String reason) {
 
-    public static AssignmentMetadata now(String assignedBy, String reason) {
-        ValidationUtils.requireNonEmpty(assignedBy, "Assigned by");
-        String normBy = ValidationUtils.normalizeString(assignedBy);
-        String normReason = ValidationUtils.normalizeString(reason);
-
-        if (normReason.isEmpty()) {
-            normReason = "No reason provided";
+    public AssignmentMetadata {
+        if (assignedBy == null || assignedBy.trim().isEmpty()) {
+            throw new IllegalArgumentException("assignedBy cannot be null or empty");
         }
+        if (reason == null || reason.trim().isEmpty()) {
+            reason = "No reason provided";
+        }
+    }
 
-        return new AssignmentMetadata(
-                normBy,
-                LocalDateTime.now().toString(),
-                normReason
-        );
+    public static AssignmentMetadata now(String assignedBy, String reason) {
+        return new AssignmentMetadata(assignedBy, DateUtils.getCurrentDateTime(), reason);
     }
 
     public String format() {

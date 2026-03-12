@@ -7,7 +7,6 @@ import org.example.rbac.model.Role;
 import org.example.rbac.model.RoleAssignment;
 import org.example.rbac.model.TemporaryAssignment;
 import org.example.rbac.model.User;
-import org.example.rbac.util.ValidationUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -65,10 +64,10 @@ public class AssignmentManager implements Repository<RoleAssignment> {
 
     @Override
     public Optional<RoleAssignment> findById(String id) {
-        if (id == null || id.trim().isEmpty()) {
+        if (id == null) {
             return Optional.empty();
         }
-        return Optional.ofNullable(assignments.get(ValidationUtils.normalizeString(id)));
+        return Optional.ofNullable(assignments.get(id));
     }
 
     @Override
@@ -149,12 +148,9 @@ public class AssignmentManager implements Repository<RoleAssignment> {
         if (user == null || permissionName == null || resource == null) {
             return false;
         }
-        String normName = ValidationUtils.normalizeString(permissionName).toUpperCase();
-        String normRes = ValidationUtils.normalizeString(resource).toLowerCase();
-
         return assignments.values().stream()
                 .filter(a -> a.isActive() && a.user().equals(user))
-                .anyMatch(a -> a.role().hasPermission(normName, normRes));
+                .anyMatch(a -> a.role().hasPermission(permissionName, resource));
     }
 
     public Set<Permission> getUserPermissions(User user) {
@@ -168,13 +164,10 @@ public class AssignmentManager implements Repository<RoleAssignment> {
     }
 
     public void revokeAssignment(String assignmentId) {
-        ValidationUtils.requireNonEmpty(assignmentId, "Assignment ID");
-        String normId = ValidationUtils.normalizeString(assignmentId);
-
-        if (!assignments.containsKey(normId)) {
+        if (assignmentId == null || !assignments.containsKey(assignmentId)) {
             throw new IllegalArgumentException();
         }
-        RoleAssignment a = assignments.get(normId);
+        RoleAssignment a = assignments.get(assignmentId);
         if (a instanceof PermanentAssignment pa) {
             pa.revoke();
         } else {
@@ -183,16 +176,12 @@ public class AssignmentManager implements Repository<RoleAssignment> {
     }
 
     public void extendTemporaryAssignment(String assignmentId, String newExpirationDate) {
-        ValidationUtils.requireNonEmpty(assignmentId, "Assignment ID");
-        ValidationUtils.requireNonEmpty(newExpirationDate, "New expiration date");
-
-        String normId = ValidationUtils.normalizeString(assignmentId);
-        if (!assignments.containsKey(normId)) {
+        if (assignmentId == null || !assignments.containsKey(assignmentId)) {
             throw new IllegalArgumentException();
         }
-        RoleAssignment a = assignments.get(normId);
+        RoleAssignment a = assignments.get(assignmentId);
         if (a instanceof TemporaryAssignment ta) {
-            ta.extend(ValidationUtils.normalizeString(newExpirationDate));
+            ta.extend(newExpirationDate);
         } else {
             throw new IllegalStateException();
         }

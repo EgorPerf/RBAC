@@ -1,8 +1,10 @@
 package org.example.rbac.model;
 
+import org.example.rbac.util.DateUtils;
 import org.example.rbac.util.ValidationUtils;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 
 public class TemporaryAssignment extends AbstractRoleAssignment {
 
@@ -12,14 +14,8 @@ public class TemporaryAssignment extends AbstractRoleAssignment {
     public TemporaryAssignment(User user, Role role, AssignmentMetadata metadata, String expiresAt, boolean autoRenew) {
         super(user, role, metadata);
         ValidationUtils.requireNonEmpty(expiresAt, "Дата истечения");
-
         this.expiresAt = ValidationUtils.normalizeString(expiresAt);
         this.autoRenew = autoRenew;
-    }
-
-    @Override
-    public boolean isActive() {
-        return !isExpired();
     }
 
     @Override
@@ -27,24 +23,47 @@ public class TemporaryAssignment extends AbstractRoleAssignment {
         return "TEMPORARY";
     }
 
+    @Override
+    public boolean isActive() {
+        String current = DateUtils.getCurrentDateTime();
+        String normalizedExpires = this.expiresAt.replace("T", " ");
+
+        // Используем DateUtils для строкового сравнения дат
+        if (DateUtils.isBefore(normalizedExpires, current)) {
+            if (autoRenew) {
+                // Используем DateUtils для добавления дней при автопродлении
+                this.expiresAt = DateUtils.addDays(this.expiresAt, 30) + " 23:59:59";
+                return true;
+            }
+            return false;
+        }
+        return true;
+    }
+
     public boolean isExpired() {
-        return LocalDateTime.now().toString().compareTo(expiresAt) > 0;
+        return !isActive();
     }
 
     public void extend(String newExpirationDate) {
         ValidationUtils.requireNonEmpty(newExpirationDate, "Новая дата истечения");
         String normDate = ValidationUtils.normalizeString(newExpirationDate);
 
-        if (normDate.compareTo(expiresAt) <= 0) {
-            throw new IllegalArgumentException("Новая дата должна быть позже текущей даты истечения.");
+        String current = DateUtils.getCurrentDateTime();
+        String normalizedNew = normDate.replace("T", " ");
+        String normalizedCurrent = this.expiresAt.replace("T", " ");
+
+        // Используем DateUtils для проверки валидности новой даты
+        if (normalizedNew.equals(normalizedCurrent) || DateUtils.isBefore(normalizedNew, current)) {
+            throw new IllegalArgumentException("Новая дата должна быть в будущем и отличаться от текущей.");
         }
         this.expiresAt = normDate;
     }
 
     @Override
     public String summary() {
-        return String.format("%s\nExpires at: %s (Auto-renew: %s)",
+        return String.format("%s\n[%s] Expires at: %s, Auto-renew: %s",
                 super.summary(),
+                assignmentType(),
                 expiresAt,
                 autoRenew ? "YES" : "NO");
     }
@@ -61,12 +80,15 @@ public class TemporaryAssignment extends AbstractRoleAssignment {
         if (isExpired()) {
             return "Time is up";
         }
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
-        java.time.LocalDateTime expiration = java.time.LocalDateTime.parse(this.expiresAt);
-        java.time.Duration duration = java.time.Duration.between(now, expiration);
-
-        long days = duration.toDays();
-        long hours = duration.toHoursPart();
-        return String.format("%d days, %d hours remaining", days, hours);
+        try {
+            LocalDateTime current = LocalDateTime.now();
+            LocalDateTime exp = LocalDateTime.parse(this.expiresAt.replace(" ", "T"));
+            long days = ChronoUnit.DAYS.between(current, exp);
+            LocalDateTime currentPlusDays = current.plusDays(days);
+            long hours = ChronoUnit.HOURS.between(currentPlusDays, exp);
+            return days + " days, " + hours + " hours remaining";
+        } catch (Exception e) {
+            return "Time is up";
+        }
     }
 }

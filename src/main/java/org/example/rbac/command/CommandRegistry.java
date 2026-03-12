@@ -10,6 +10,7 @@ import org.example.rbac.model.TemporaryAssignment;
 import org.example.rbac.model.User;
 import org.example.rbac.report.ReportGenerator;
 import org.example.rbac.util.ConsoleUtils;
+import org.example.rbac.util.DateUtils;
 import org.example.rbac.util.FormatUtils;
 import org.example.rbac.util.ValidationUtils;
 
@@ -315,7 +316,7 @@ public class CommandRegistry {
                         return;
                     }
                     boolean autoRenew = ConsoleUtils.promptYesNo(scanner, "Enable auto-renew?");
-                    String expiration = LocalDate.parse(dateStr).atTime(23, 59, 59).toString();
+                    String expiration = dateStr + " 23:59:59";
                     system.getAssignmentManager().add(new TemporaryAssignment(userOpt.get(), role, metadata, expiration, autoRenew));
                 } else {
                     system.getAssignmentManager().add(new PermanentAssignment(userOpt.get(), role, metadata));
@@ -356,7 +357,7 @@ public class CommandRegistry {
             for (User u : system.getUserManager().findAll()) {
                 for (RoleAssignment a : system.getAssignmentManager().findByUser(u)) {
                     rows.add(new String[]{u.username(), a.role().getName(), (a instanceof PermanentAssignment) ? "PERM" : "TEMP",
-                            a.isActive() ? "ACTIVE" : "EXPIRED", a.metadata().assignedAt().substring(0, 16).replace("T", " ")});
+                            a.isActive() ? "ACTIVE" : "EXPIRED", a.metadata().assignedAt().substring(0, 16)});
                 }
             }
             if (rows.isEmpty()) System.out.println("No assignments found.");
@@ -369,9 +370,16 @@ public class CommandRegistry {
                 List<RoleAssignment> assignments = system.getAssignmentManager().findByUser(u);
                 if (assignments.isEmpty()) System.out.println("No assignments found.");
                 else {
-                    List<String[]> rows = assignments.stream().map(a -> new String[]{a.role().getName(), (a instanceof PermanentAssignment) ? "PERM" : "TEMP",
-                            a.isActive() ? "ACTIVE" : "EXPIRED", a.metadata().assignedAt().substring(0, 16).replace("T", " ")}).toList();
-                    System.out.println(ConsoleUtils.ANSI_CYAN + FormatUtils.formatTable(new String[]{"Role", "Type", "Status", "Assigned At"}, rows) + ConsoleUtils.ANSI_RESET);
+                    List<String[]> rows = assignments.stream().map(a -> {
+                        String details = "";
+                        if (a instanceof TemporaryAssignment ta) {
+                            details = DateUtils.formatRelativeTime(ta.getExpiresAt());
+                            if (ta.isAutoRenew()) details += " (Auto)";
+                        }
+                        return new String[]{a.role().getName(), (a instanceof PermanentAssignment) ? "PERM" : "TEMP",
+                                a.isActive() ? "ACTIVE" : "EXPIRED", a.metadata().assignedAt().substring(0, 16), details};
+                    }).toList();
+                    System.out.println(ConsoleUtils.ANSI_CYAN + FormatUtils.formatTable(new String[]{"Role", "Type", "Status", "Assigned At", "Details"}, rows) + ConsoleUtils.ANSI_RESET);
                 }
             }, () -> System.out.println(ConsoleUtils.ANSI_RED + "User not found." + ConsoleUtils.ANSI_RESET));
         });
@@ -394,7 +402,7 @@ public class CommandRegistry {
             List<String[]> rows = new ArrayList<>();
             for (User u : system.getUserManager().findAll()) {
                 for (RoleAssignment a : system.getAssignmentManager().findByUser(u)) {
-                    if (a.isActive()) rows.add(new String[]{u.username(), a.role().getName(), (a instanceof PermanentAssignment) ? "PERM" : "TEMP", a.metadata().assignedAt().substring(0, 16).replace("T", " ")});
+                    if (a.isActive()) rows.add(new String[]{u.username(), a.role().getName(), (a instanceof PermanentAssignment) ? "PERM" : "TEMP", a.metadata().assignedAt().substring(0, 16)});
                 }
             }
             if (rows.isEmpty()) System.out.println("No active assignments found.");
@@ -406,7 +414,8 @@ public class CommandRegistry {
             for (User u : system.getUserManager().findAll()) {
                 for (RoleAssignment a : system.getAssignmentManager().findByUser(u)) {
                     if (a instanceof TemporaryAssignment ta && !a.isActive()) {
-                        rows.add(new String[]{u.username(), a.role().getName(), ta.getExpiresAt().replace("T", " ")});
+                        String exp = ta.getExpiresAt();
+                        rows.add(new String[]{u.username(), a.role().getName(), exp + " (" + DateUtils.formatRelativeTime(exp) + ")"});
                     }
                 }
             }
@@ -442,7 +451,7 @@ public class CommandRegistry {
                 return;
             }
             try {
-                target.extend(LocalDate.parse(dateStr).atTime(23, 59, 59).toString());
+                target.extend(dateStr + " 23:59:59");
                 System.out.println(ConsoleUtils.ANSI_GREEN + "Assignment extended successfully." + ConsoleUtils.ANSI_RESET);
             } catch (IllegalArgumentException e) {
                 System.out.println(ConsoleUtils.ANSI_RED + "Error: " + e.getMessage() + ConsoleUtils.ANSI_RESET);
@@ -476,14 +485,14 @@ public class CommandRegistry {
                 case 4 -> {
                     String d = ConsoleUtils.promptString(scanner, "Enter assigned after date (YYYY-MM-DD)", true);
                     if (!ValidationUtils.isValidDate(d)) { System.out.println(ConsoleUtils.ANSI_RED + "Invalid date." + ConsoleUtils.ANSI_RESET); yield new ArrayList<RoleAssignment>(); }
-                    LocalDateTime dt = LocalDate.parse(d).atStartOfDay();
-                    yield allAssignments.stream().filter(a -> LocalDateTime.parse(a.metadata().assignedAt().toString()).isAfter(dt)).toList();
+                    String dt = d + " 00:00:00";
+                    yield allAssignments.stream().filter(a -> DateUtils.isAfter(a.metadata().assignedAt().replace("T", " "), dt)).toList();
                 }
                 case 5 -> {
                     String d = ConsoleUtils.promptString(scanner, "Enter expires before date (YYYY-MM-DD)", true);
                     if (!ValidationUtils.isValidDate(d)) { System.out.println(ConsoleUtils.ANSI_RED + "Invalid date." + ConsoleUtils.ANSI_RESET); yield new ArrayList<RoleAssignment>(); }
-                    LocalDateTime dt = LocalDate.parse(d).atTime(23, 59, 59);
-                    yield allAssignments.stream().filter(a -> a instanceof TemporaryAssignment ta && LocalDateTime.parse(ta.getExpiresAt()).isBefore(dt)).toList();
+                    String dt = d + " 23:59:59";
+                    yield allAssignments.stream().filter(a -> a instanceof TemporaryAssignment ta && DateUtils.isBefore(ta.getExpiresAt(), dt)).toList();
                 }
                 default -> new ArrayList<>();
             };
@@ -491,7 +500,7 @@ public class CommandRegistry {
             if (result.isEmpty()) System.out.println("No assignments found matching criteria.");
             else {
                 List<String[]> rows = result.stream().map(a -> new String[]{a.user().username(), a.role().getName(), (a instanceof PermanentAssignment) ? "PERM" : "TEMP",
-                        a.isActive() ? "ACTIVE" : "EXPIRED", a.metadata().assignedAt().substring(0, 16).replace("T", " ")}).toList();
+                        a.isActive() ? "ACTIVE" : "EXPIRED", a.metadata().assignedAt().substring(0, 16)}).toList();
                 System.out.println(ConsoleUtils.ANSI_CYAN + FormatUtils.formatTable(new String[]{"Username", "Role", "Type", "Status", "Assigned At"}, rows) + ConsoleUtils.ANSI_RESET);
             }
         });
@@ -643,9 +652,9 @@ public class CommandRegistry {
                     for (RoleAssignment a : system.getAssignmentManager().findByUser(u)) {
                         AssignmentMetadata m = a.metadata();
                         if (a instanceof PermanentAssignment) {
-                            writer.printf("PERM|%s|%s|%s|%s|%s%n", u.username(), a.role().getName(), m.assignedAt(), m.assignedBy(), m.reason());
+                            writer.printf("PERM|%s|%s|%s|%s|%s%n", u.username(), a.role().getName(), m.assignedBy(), m.assignedAt(), m.reason());
                         } else if (a instanceof TemporaryAssignment ta) {
-                            writer.printf("TEMP|%s|%s|%s|%s|%s|%s|%s%n", u.username(), a.role().getName(), m.assignedAt(), m.assignedBy(), m.reason(), ta.getExpiresAt(), ta.isAutoRenew());
+                            writer.printf("TEMP|%s|%s|%s|%s|%s|%s|%s%n", u.username(), a.role().getName(), m.assignedBy(), m.assignedAt(), m.reason(), ta.getExpiresAt(), ta.isAutoRenew());
                         }
                     }
                 }
