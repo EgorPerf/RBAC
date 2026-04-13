@@ -1,0 +1,10 @@
+[USERS]
+system|System Administrator|system@company.com
+admin|System Administrator|admin@system.com
+[ROLES]
+Manager|Manager|READ^data^Read data~WRITE^data^Write data
+Viewer|Viewer|READ^data^Read data
+Admin|Administrator|EXECUTE^simulator^Can run multithreaded simulations~READ^data^Read data~DELETE^data^Delete data~WRITE^data^Write data
+[ASSIGNMENTS]
+PERM|system|Admin|system|2026-04-13 06:42:38|System init
+PERM|admin|Admin|system|2026-04-13 06:41:53|System Initialization
