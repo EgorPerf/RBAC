@@ -13,6 +13,7 @@ import org.example.rbac.util.ConsoleUtils;
 import org.example.rbac.util.DateUtils;
 import org.example.rbac.util.FormatUtils;
 import org.example.rbac.util.ValidationUtils;
+import org.example.rbac.util.CalculationSimulator;
 
 import java.io.File;
 import java.io.PrintWriter;
@@ -594,6 +595,29 @@ public class CommandRegistry {
 
         parser.registerCommand("help", "Show all commands with descriptions", (scanner, system) -> parser.printHelp());
 
+        parser.registerCommand("simulate-calc", "Simulation of multithread calculation", (scanner, system) -> {
+            User currentUser = system.getUserManager().findByUsername(system.getCurrentUser()).orElse(null);
+
+            if (currentUser == null) {
+                System.out.println(ConsoleUtils.ANSI_RED + "Системная ошибка: текущий пользователь не найден." + ConsoleUtils.ANSI_RESET);
+                return;
+            }
+
+            if (!system.getAssignmentManager().userHasPermission(currentUser, "EXECUTE", "simulator")) {
+                System.out.println(ConsoleUtils.ANSI_RED + "Access DENIED. У вас нет прав для запуска симулятора." + ConsoleUtils.ANSI_RESET);
+                System.out.println("Требуемое право: " + ConsoleUtils.ANSI_YELLOW + "EXECUTE:simulator" + ConsoleUtils.ANSI_RESET);
+                system.getAuditLog().log("ACCESS_DENIED", currentUser.username(), "simulator", "Unauthorized attempt to run multithreaded calc");
+                return;
+            }
+
+            int threads = ConsoleUtils.promptInt(scanner, "Введите количество потоков", 1, 50);
+            int steps = ConsoleUtils.promptInt(scanner, "Введите длину расчёта (количество шагов)", 10, 1000);
+            int delay = ConsoleUtils.promptInt(scanner, "Введите задержку на один шаг (мс)", 1, 5000);
+
+            system.getAuditLog().log("SIMULATOR_RUN", currentUser.username(), "calc", "Started simulation with " + threads + " threads");
+            CalculationSimulator.runSimulation(threads, steps, delay);
+        });
+
         parser.registerCommand("stats", "System statistics", (scanner, system) -> {
             int userCount = system.getUserManager().findAll().size();
             int roleCount = system.getRoleManager().findAll().size();
@@ -667,6 +691,11 @@ public class CommandRegistry {
         parser.registerCommand("load", "Load data from file", (scanner, system) -> {
             String filename = ConsoleUtils.promptString(scanner, "Enter filename", false);
             if (filename.isEmpty()) filename = "rbac.txt";
+
+            system.getAssignmentManager().clear();
+            system.getRoleManager().clear();
+            system.getUserManager().clear();
+
             try (Scanner fileScanner = new Scanner(new File(filename))) {
                 String section = "";
                 while (fileScanner.hasNextLine()) {
