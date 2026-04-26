@@ -197,6 +197,20 @@ public class AssignmentManager implements Repository<RoleAssignment> {
                 .collect(Collectors.toList());
     }
 
+    public void processExpirations(AuditLog auditLog) {
+        assignments.values().forEach(a -> {
+            if (a instanceof TemporaryAssignment ta) {
+                if (ta.isActive() && ta.isExpired()) {
+                    if (ta.isAutoRenew()) {
+                        auditLog.log("ASSIGNMENT_AUTORENEW", "SYSTEM", ta.user().username(), "Role: " + ta.role().getName());
+                    } else {
+                        auditLog.log("ASSIGNMENT_EXPIRED", "SYSTEM", ta.user().username(), "Role: " + ta.role().getName());
+                    }
+                }
+            }
+        });
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

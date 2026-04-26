@@ -3,13 +3,23 @@ package org.example.rbac;
 import org.example.rbac.command.CommandParser;
 import org.example.rbac.command.CommandRegistry;
 import org.example.rbac.util.ConsoleUtils;
+import org.example.rbac.util.TaskScheduler;
 
 import java.util.Scanner;
 
 public class Main {
     public static void main(String[] args) {
         RBACSystem system = new RBACSystem();
-        system.initialize(); // Создаст роль Admin и пользователя admin
+        system.initialize();
+
+        TaskScheduler scheduler = new TaskScheduler();
+        scheduler.start(
+                system.getUserManager(),
+                system.getRoleManager(),
+                system.getAssignmentManager(),
+                system.getAuditLog(),
+                60
+        );
 
         CommandParser parser = new CommandParser();
         CommandRegistry.registerUserCommands(parser);
@@ -44,7 +54,10 @@ public class Main {
                 System.out.println(ConsoleUtils.ANSI_RED + "Непредвиденная ошибка: " + e.getMessage() + ConsoleUtils.ANSI_RESET);
             }
         }
+
+        scheduler.stop();
         scanner.close();
+
         System.out.println(ConsoleUtils.ANSI_GREEN + "Работа системы завершена. До свидания!" + ConsoleUtils.ANSI_RESET);
     }
 }
