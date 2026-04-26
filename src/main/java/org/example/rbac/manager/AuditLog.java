@@ -8,16 +8,34 @@ import java.io.PrintWriter;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
 
 public class AuditLog {
 
     private final List<AuditEntry> entries = new CopyOnWriteArrayList<>();
+    private final BlockingQueue<AuditEntry> queue = new LinkedBlockingQueue<>();
+
+    public AuditLog() {
+        Thread worker = new Thread(() -> {
+            try {
+                while (!Thread.currentThread().isInterrupted()) {
+                    AuditEntry entry = queue.take();
+                    entries.add(entry);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        worker.setDaemon(true);
+        worker.start();
+    }
 
     public void log(String action, String performer, String target, String details) {
         String timestamp = LocalDateTime.now().toString();
-        entries.add(new AuditEntry(
+        queue.offer(new AuditEntry(
                 timestamp,
                 ValidationUtils.normalizeString(action),
                 ValidationUtils.normalizeString(performer),

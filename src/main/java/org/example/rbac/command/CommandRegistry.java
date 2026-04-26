@@ -576,6 +576,24 @@ public class CommandRegistry {
             if (!fn.isEmpty()) generator.exportToFile(report, fn);
         });
 
+        parser.registerCommand("report-users-async", "Generate and save user report in background", (scanner, system) -> {
+            String filename = ConsoleUtils.promptString(scanner, "Enter filename to save", true);
+            System.out.println(ConsoleUtils.ANSI_YELLOW + "Задача поставлена в очередь. Отчёт генерируется в фоне..." + ConsoleUtils.ANSI_RESET);
+
+            org.example.rbac.util.BackgroundExecutor.execute(() -> {
+                try {
+                    org.example.rbac.report.ReportGenerator generator = new org.example.rbac.report.ReportGenerator();
+                    String report = generator.generateUserReport(system.getUserManager(), system.getAssignmentManager());
+                    generator.exportToFile(report, filename);
+                    System.out.println(ConsoleUtils.ANSI_GREEN + "\n[ФОНОВАЯ ЗАДАЧА] Отчёт успешно сохранён в " + filename + ConsoleUtils.ANSI_RESET);
+                    System.out.print("RBAC [system] > ");
+                } catch (Exception e) {
+                    System.out.println(ConsoleUtils.ANSI_RED + "\n[ФОНОВАЯ ЗАДАЧА] Ошибка генерации: " + e.getMessage() + ConsoleUtils.ANSI_RESET);
+                    System.out.print("RBAC [system] > ");
+                }
+            });
+        });
+
         parser.registerCommand("report-roles", "Generate and save role report", (scanner, system) -> {
             ReportGenerator generator = new ReportGenerator();
             String report = generator.generateRoleReport(system.getRoleManager(), system.getAssignmentManager());
@@ -664,6 +682,45 @@ public class CommandRegistry {
             }
         });
 
+        parser.registerCommand("save-async", "Save system data to file in background", (scanner, system) -> {
+            String input = ConsoleUtils.promptString(scanner, "Enter filename", false);
+            final String filename = input.isEmpty() ? "rbac.txt" : input;
+
+            System.out.println(ConsoleUtils.ANSI_YELLOW + "Сохранение запущено в фоновом потоке..." + ConsoleUtils.ANSI_RESET);
+
+            org.example.rbac.util.BackgroundExecutor.execute(() -> {
+                try (PrintWriter writer = new PrintWriter(filename)) {
+                    writer.println("[USERS]");
+                    for (User u : system.getUserManager().findAll()) {
+                        writer.printf("%s|%s|%s%n", u.username(), u.fullName(), u.email());
+                    }
+                    writer.println("[ROLES]");
+                    for (Role r : system.getRoleManager().findAll()) {
+                        writer.printf("%s|%s|", r.getName(), r.getDescription());
+                        List<String> perms = new ArrayList<>();
+                        for (Permission p : r.getPermissions()) perms.add(p.name() + "^" + p.resource() + "^" + p.description());
+                        writer.println(String.join("~", perms));
+                    }
+                    writer.println("[ASSIGNMENTS]");
+                    for (User u : system.getUserManager().findAll()) {
+                        for (RoleAssignment a : system.getAssignmentManager().findByUser(u)) {
+                            AssignmentMetadata m = a.metadata();
+                            if (a instanceof PermanentAssignment) {
+                                writer.printf("PERM|%s|%s|%s|%s|%s%n", u.username(), a.role().getName(), m.assignedBy(), m.assignedAt(), m.reason());
+                            } else if (a instanceof TemporaryAssignment ta) {
+                                writer.printf("TEMP|%s|%s|%s|%s|%s|%s|%s%n", u.username(), a.role().getName(), m.assignedBy(), m.assignedAt(), m.reason(), ta.getExpiresAt(), ta.isAutoRenew());
+                            }
+                        }
+                    }
+                    System.out.println(ConsoleUtils.ANSI_GREEN + "\n[ФОНОВАЯ ЗАДАЧА] Данные успешно сохранены в " + filename + ConsoleUtils.ANSI_RESET);
+                    System.out.print("RBAC [system] > ");
+                } catch (Exception e) {
+                    System.out.println(ConsoleUtils.ANSI_RED + "\n[ФОНОВАЯ ЗАДАЧА] Ошибка сохранения: " + e.getMessage() + ConsoleUtils.ANSI_RESET);
+                    System.out.print("RBAC [system] > ");
+                }
+            });
+        });
+
         parser.registerCommand("load", "Load data from file", (scanner, system) -> {
             String filename = ConsoleUtils.promptString(scanner, "Enter filename", false);
             if (filename.isEmpty()) filename = "rbac.txt";
@@ -722,6 +779,7 @@ public class CommandRegistry {
                     try { parser.executeCommand("save", scanner, system); } catch (Exception ignored) {}
                 }
                 System.out.println("Exiting...");
+                org.example.rbac.util.BackgroundExecutor.shutdown();
                 throw new RuntimeException("EXIT_SIGNAL");
             }
         });
