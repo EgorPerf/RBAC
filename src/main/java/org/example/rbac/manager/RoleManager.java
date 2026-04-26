@@ -7,21 +7,22 @@ import org.example.rbac.util.ValidationUtils;
 
 import java.lang.reflect.Field;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 public class RoleManager implements Repository<Role> {
 
-    private final Map<String, Role> byId = new HashMap<>();
-    private final Map<String, Role> byName = new HashMap<>();
+    private final Map<String, Role> byId = new ConcurrentHashMap<>();
+    private final Map<String, Role> byName = new ConcurrentHashMap<>();
     private Predicate<Role> inUseChecker = role -> false;
 
-    public void setInUseChecker(Predicate<Role> inUseChecker) {
+    public synchronized void setInUseChecker(Predicate<Role> inUseChecker) {
         this.inUseChecker = inUseChecker != null ? inUseChecker : role -> false;
     }
 
     @Override
-    public void add(Role item) {
+    public synchronized void add(Role item) {
         if (item == null) {
             throw new IllegalArgumentException();
         }
@@ -33,7 +34,7 @@ public class RoleManager implements Repository<Role> {
     }
 
     @Override
-    public boolean remove(Role item) {
+    public synchronized boolean remove(Role item) {
         if (item == null || !byId.containsKey(item.getId())) {
             return false;
         }
@@ -75,7 +76,7 @@ public class RoleManager implements Repository<Role> {
     }
 
     @Override
-    public void clear() {
+    public synchronized void clear() {
         byId.clear();
         byName.clear();
         Role.clearUsedNames();
@@ -114,7 +115,7 @@ public class RoleManager implements Repository<Role> {
         return byName.containsKey(ValidationUtils.normalizeString(name));
     }
 
-    public void addPermissionToRole(String roleName, Permission permission) {
+    public synchronized void addPermissionToRole(String roleName, Permission permission) {
         ValidationUtils.requireNonEmpty(roleName, "Role name");
         if (permission == null) {
             throw new IllegalArgumentException();
@@ -126,7 +127,7 @@ public class RoleManager implements Repository<Role> {
         role.addPermission(permission);
     }
 
-    public void removePermissionFromRole(String roleName, Permission permission) {
+    public synchronized void removePermissionFromRole(String roleName, Permission permission) {
         ValidationUtils.requireNonEmpty(roleName, "Role name");
         if (permission == null) {
             throw new IllegalArgumentException();

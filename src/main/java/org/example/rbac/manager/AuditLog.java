@@ -8,11 +8,12 @@ import java.io.PrintWriter;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
 public class AuditLog {
 
-    private final List<AuditEntry> entries = new ArrayList<>();
+    private final List<AuditEntry> entries = new CopyOnWriteArrayList<>();
 
     public void log(String action, String performer, String target, String details) {
         String timestamp = LocalDateTime.now().toString();
@@ -60,7 +61,7 @@ public class AuditLog {
         System.out.println(FormatUtils.formatTable(headers, rows));
     }
 
-    public void saveToFile(String filename) {
+    public synchronized void saveToFile(String filename) {
         ValidationUtils.requireNonEmpty(filename, "Filename");
         try (PrintWriter writer = new PrintWriter(ValidationUtils.normalizeString(filename))) {
             String[] headers = {"Timestamp", "Action", "Performer", "Target", "Details"};
