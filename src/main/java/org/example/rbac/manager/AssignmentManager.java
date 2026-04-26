@@ -188,6 +188,15 @@ public class AssignmentManager implements Repository<RoleAssignment> {
         }
     }
 
+    public List<RoleAssignment> findByFilterParallel(AssignmentFilter filter) {
+        if (filter == null) {
+            return findAll();
+        }
+        return assignments.values().parallelStream()
+                .filter(filter::test)
+                .collect(Collectors.toList());
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

@@ -105,6 +105,15 @@ public class UserManager implements Repository<User> {
         users.put(normUsername, updatedUser);
     }
 
+    public List<User> findByFilterParallel(UserFilter filter) {
+        if (filter == null) {
+            return findAll();
+        }
+        return users.values().parallelStream()
+                .filter(filter::test)
+                .collect(Collectors.toList());
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

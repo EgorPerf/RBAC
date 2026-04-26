@@ -21,33 +21,35 @@ public class ReportGenerator {
 
     public String generateUserReport(UserManager userManager, AssignmentManager assignmentManager) {
         String[] headers = {"Username", "Email", "Active Roles"};
-        List<String[]> rows = new ArrayList<>();
-        for (User u : userManager.findAll()) {
-            List<String> roles = assignmentManager.findByUser(u).stream()
-                    .filter(RoleAssignment::isActive)
-                    .map(a -> a.role().getName())
-                    .toList();
-            String rolesStr = roles.isEmpty() ? "None" : String.join(", ", roles);
-            rows.add(new String[]{u.username(), u.email(), rolesStr});
-        }
+        List<String[]> rows = userManager.findAll().parallelStream()
+                .map(u -> {
+                    List<String> roles = assignmentManager.findByUser(u).stream()
+                            .filter(RoleAssignment::isActive)
+                            .map(a -> a.role().getName())
+                            .toList();
+                    String rolesStr = roles.isEmpty() ? "None" : String.join(", ", roles);
+                    return new String[]{u.username(), u.email(), rolesStr};
+                })
+                .collect(Collectors.toList());
         return FormatUtils.formatTable(headers, rows) + "\n";
     }
 
     public String generateRoleReport(RoleManager roleManager, AssignmentManager assignmentManager) {
         String[] headers = {"Role Name", "Description", "Active Users Count"};
-        List<String[]> rows = new ArrayList<>();
-        for (Role r : roleManager.findAll()) {
-            long count = assignmentManager.findByRole(r).stream().filter(RoleAssignment::isActive).count();
-            rows.add(new String[]{r.getName(), FormatUtils.truncate(r.getDescription(), 30), String.valueOf(count)});
-        }
+        List<String[]> rows = roleManager.findAll().stream()
+                .map(r -> {
+                    long count = assignmentManager.findByRole(r).stream().filter(RoleAssignment::isActive).count();
+                    return new String[]{r.getName(), FormatUtils.truncate(r.getDescription(), 30), String.valueOf(count)};
+                })
+                .collect(Collectors.toList());
         return FormatUtils.formatTable(headers, rows) + "\n";
     }
 
     public String generatePermissionMatrix(UserManager userManager, AssignmentManager assignmentManager) {
-        Set<String> resources = new TreeSet<>();
-        for (User u : userManager.findAll()) {
-            assignmentManager.getUserPermissions(u).forEach(p -> resources.add(p.resource()));
-        }
+        Set<String> resources = userManager.findAll().parallelStream()
+                .flatMap(u -> assignmentManager.getUserPermissions(u).stream())
+                .map(Permission::resource)
+                .collect(Collectors.toCollection(TreeSet::new));
 
         if (resources.isEmpty()) {
             return "No permissions assigned to any user.\n";
@@ -58,23 +60,25 @@ public class ReportGenerator {
         headers[0] = "User \\ Resource";
         for (int i = 0; i < resList.size(); i++) headers[i + 1] = resList.get(i);
 
-        List<String[]> rows = new ArrayList<>();
-        for (User u : userManager.findAll()) {
-            String[] row = new String[headers.length];
-            row[0] = u.username();
-            Set<Permission> perms = assignmentManager.getUserPermissions(u);
+        List<String[]> rows = userManager.findAll().parallelStream()
+                .map(u -> {
+                    String[] row = new String[headers.length];
+                    row[0] = u.username();
+                    Set<Permission> perms = assignmentManager.getUserPermissions(u);
 
-            for (int i = 0; i < resList.size(); i++) {
-                String res = resList.get(i);
-                String actions = perms.stream()
-                        .filter(p -> p.resource().equals(res))
-                        .map(Permission::name)
-                        .sorted()
-                        .collect(Collectors.joining(","));
-                row[i + 1] = actions.isEmpty() ? "-" : actions;
-            }
-            rows.add(row);
-        }
+                    for (int i = 0; i < resList.size(); i++) {
+                        String res = resList.get(i);
+                        String actions = perms.stream()
+                                .filter(p -> p.resource().equals(res))
+                                .map(Permission::name)
+                                .sorted()
+                                .collect(Collectors.joining(","));
+                        row[i + 1] = actions.isEmpty() ? "-" : actions;
+                    }
+                    return row;
+                })
+                .collect(Collectors.toList());
+
         return FormatUtils.formatTable(headers, rows) + "\n";
     }
 
